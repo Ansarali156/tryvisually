@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  EDUCATOR
+  ADMIN
+}
+
+enum Difficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  PASSED
+  FAILED
+}
+
+model User {
+  id           String           @id @default(cuid())
+  email        String           @unique
+  name         String?
+  role         Role             @default(STUDENT)
+  avatarUrl    String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  progress     UserProgress[]
+  submissions  UserSubmission[]
+
+  @@map("users")
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  order       Int      @default(0)
+  topics      Topic[]
+  createdAt   DateTime @default(now())
+
+  @@map("categories")
+}
+
+model Topic {
+  id          String         @id @default(cuid())
+  title       String
+  slug        String         @unique
+  description String
+  difficulty  Difficulty     @default(BEGINNER)
+  category    Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId  String
+  order       Int            @default(0)
+  problems    Problem[]
+  quizzes     Quiz[]
+  progress    UserProgress[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@map("topics")
+}
+
+model Problem {
+  id           String           @id @default(cuid())
+  title        String
+  slug         String           @unique
+  description  String
+  difficulty   Difficulty       @default(BEGINNER)
+  topic        Topic            @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  topicId      String
+  constraints  String[]
+  sampleInput  String?
+  sampleOutput String?
+  submissions  UserSubmission[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@map("problems")
+}
+
+model Quiz {
+  id        String         @id @default(cuid())
+  title     String
+  topic     Topic          @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  topicId   String
+  questions QuizQuestion[]
+  createdAt DateTime       @default(now())
+
+  @@map("quizzes")
+}
+
+model QuizQuestion {
+  id          String   @id @default(cuid())
+  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  quizId      String
+  question    String
+  options     String[]
+  correctIndex Int
+  explanation String
+  createdAt   DateTime @default(now())
+
+  @@map("quiz_questions")
+}
+
+model UserProgress {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  topicId   String
+  completed Boolean  @default(false)
+  lastStep  Int      @default(0)
+  quizScore Int?
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, topicId])
+  @@map("user_progress")
+}
+
+model UserSubmission {
+  id        String           @id @default(cuid())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  problem   Problem          @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  problemId String
+  code      String
+  language  String
+  status    SubmissionStatus @default(SUBMITTED)
+  createdAt DateTime         @default(now())
+
+  @@map("user_submissions")
+}
