@@ -8,7 +8,7 @@ import type {
 import type { PlaybackSpeed } from "@/core/execution/types";
 import type { LinkedListState } from "@/core/linked-list/types";
 import { useVisualizationAnimation } from "@/core/animation/hooks/use-visualization-animation";
-import { getElementInterpolatedStyle } from "@/core/animation/renderer/animation-renderer";
+import { getElementFlowStyle } from "@/core/animation/renderer/animation-renderer";
 import { cn } from "@/lib/utils";
 import { ArrowDown, CornerDownLeft, GitCommit, Layers } from "lucide-react";
 
@@ -85,7 +85,7 @@ export function LinkedListRenderer({
         {visualizationState.elements.map((element, index) => {
           const highlight = resolvedHighlights?.get(element.id);
           const interpolated = interpolatedTransforms.get(element.id);
-          const dynamicStyle = getElementInterpolatedStyle(interpolated, element.position);
+          const dynamicStyle = getElementFlowStyle(interpolated, element.position);
           const pointers = pointersByElementId.get(element.id) || [];
           const isLast = index === visualizationState.elements.length - 1;
 

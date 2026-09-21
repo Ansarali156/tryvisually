@@ -55,8 +55,8 @@ export default async function TheorySlugPage({ params }: PageProps) {
       {/* Main Theory Reader Content */}
       <div className="w-full bg-surface-50 dark:bg-surface-950 flex-1 py-6 sm:py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto">
-          {/* Framed Container Box matching TRY VISUALLY visual design language */}
-          <div className="rounded-2xl border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-surface-900 shadow-sm p-5 sm:p-7 lg:p-8 space-y-6">
+          {/* Borderless Reader Container matching clean UI requirements */}
+          <div className="space-y-6">
             
             {/* Header: Title, Category Badge, and Visualizer Action */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">

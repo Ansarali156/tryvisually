@@ -185,14 +185,12 @@ export function QueueVisualizerShell({
             </button>
             <button
               onClick={() => {
-                const parsed = customInput
-                  .split(",")
-                  .map((s) => parseInt(s.trim(), 10))
-                  .filter((n) => !isNaN(n));
+                const matches = customInput.match(/-?\d+/g);
+                const parsed = matches ? matches.map((m) => parseInt(m, 10)).filter((n) => !isNaN(n)) : [];
                 if (parsed.length > 0) {
-                  setQueueValues(parsed);
+                  setQueueValues(parsed.slice(0, 10));
                   setCustomInput("");
-                  engine.reset();
+                  executeOp("front");
                 }
               }}
               className="px-3 py-1 text-xs font-bold bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
@@ -215,6 +213,23 @@ export function QueueVisualizerShell({
       ]}
       activeSubVariant={variant}
       onSelectSubVariant={(id) => handleChangeVariant(id as QueueVariant)}
+      manualInput={{
+        label: "Queue",
+        placeholder: "Enter queue sequence front-to-back (values: 10, 20, 30...)",
+        defaultValue: queueValues.join(", "),
+        onSubmit: (val) => {
+          const matches = val.match(/-?\d+/g);
+          const parsed = matches ? matches.map((m) => parseInt(m, 10)).filter((n) => !isNaN(n)) : [];
+          if (parsed.length > 0) {
+            setQueueValues(parsed.slice(0, 10));
+            executeOp("front");
+          }
+        },
+        presets: [
+          { label: "Default", value: "10, 20, 30" },
+          { label: "Random 4", value: Array.from({ length: 4 }, () => Math.floor(Math.random() * 90) + 10).join(", ") },
+        ],
+      }}
       actions={actions}
       statusBadge={
         engine.isPlaying

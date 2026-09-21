@@ -14,14 +14,15 @@ import {
   Code2,
   Sparkles,
   Zap,
-  CheckCircle2,
   Clock,
   Layers,
-  HelpCircle,
   X,
+  Sliders,
+  Maximize2,
 } from "lucide-react";
 import type { SupportedLanguage, SourceCode } from "@/core/synchronization/types";
 import type { PlaybackSpeed } from "@/core/execution/types";
+import { ZoomableCanvas } from "./zoomable-canvas";
 
 export interface VisuAlgoActionParam {
   name: string;
@@ -51,6 +52,14 @@ export interface VisuAlgoCodeLine {
   lineNumber: number;
   text: string;
   active?: boolean;
+}
+
+export interface VisuAlgoManualInput {
+  label?: string;
+  placeholder?: string;
+  defaultValue?: string;
+  onSubmit: (val: string) => void;
+  presets?: { label: string; value: string }[];
 }
 
 export interface VisuAlgoShellProps {
@@ -91,6 +100,8 @@ export interface VisuAlgoShellProps {
   activeCodeLines?: readonly number[] | number[];
   language?: SupportedLanguage;
   onLanguageChange?: (lang: SupportedLanguage) => void;
+  // Manual Input Bar
+  manualInput?: VisuAlgoManualInput;
   // Canvas / Main Viewport
   children: React.ReactNode;
   className?: string;
@@ -130,6 +141,7 @@ export function VisuAlgoShell({
   activeCodeLines = [],
   language = "python",
   onLanguageChange,
+  manualInput,
   children,
   className,
 }: VisuAlgoShellProps) {
@@ -137,7 +149,7 @@ export function VisuAlgoShell({
   const effectiveExplanation =
     statusExplanation ??
     stepExplanation ??
-    "Select an operation from the bottom-left menu to begin visualization.";
+    "Select an operation from the bottom-left menu or enter custom input to begin visualization.";
   const effectiveTimeComplexity = complexityBadge ?? timeComplexity;
 
   // Local state for active action tray & parameters
@@ -145,7 +157,6 @@ export function VisuAlgoShell({
     actions[0]?.id || null
   );
   const activeActionId = controlledActionId !== undefined ? controlledActionId : internalActionId;
-
   const activeAction = actions.find((a) => a.id === activeActionId) || null;
 
   // Form parameter values for active tray
@@ -166,6 +177,43 @@ export function VisuAlgoShell({
   const [isStatusCollapsed, setIsStatusCollapsed] = React.useState<boolean>(false);
   const [isActionTrayOpen, setIsActionTrayOpen] = React.useState<boolean>(false);
 
+  // Manual input state (either from prop or auto-discovered from create/manual action)
+  const fallbackCreateAction = React.useMemo(() => {
+    return actions.find((a) => a.id === "create" || a.id === "manual" || a.id === "custom" || a.id === "build");
+  }, [actions]);
+
+  const [manualInputValue, setManualInputValue] = React.useState<string>(
+    manualInput?.defaultValue ||
+      (fallbackCreateAction?.params?.[0]?.defaultValue as string) ||
+      ""
+  );
+
+  React.useEffect(() => {
+    if (manualInput?.defaultValue !== undefined) {
+      setManualInputValue(manualInput.defaultValue);
+    } else if (fallbackCreateAction?.params?.[0]?.defaultValue !== undefined) {
+      setManualInputValue(String(fallbackCreateAction.params[0].defaultValue));
+    }
+  }, [manualInput?.defaultValue, fallbackCreateAction]);
+
+  const handleManualInputSubmit = React.useCallback(
+    (valueToSubmit?: string) => {
+      const val = (valueToSubmit !== undefined ? valueToSubmit : manualInputValue).trim();
+      if (!val) return;
+
+      if (manualInput) {
+        manualInput.onSubmit(val);
+        return;
+      }
+
+      if (fallbackCreateAction?.onExecute) {
+        const firstParam = fallbackCreateAction.params?.[0]?.name || "input";
+        fallbackCreateAction.onExecute({ [firstParam]: val });
+      }
+    },
+    [manualInput, fallbackCreateAction, manualInputValue]
+  );
+
   const maxStep = Math.max(0, totalSteps - 1);
   const isAtStart = currentStep <= 0;
   const isAtEnd = currentStep >= maxStep;
@@ -179,11 +227,7 @@ export function VisuAlgoShell({
     }
 
     if (action.popoverContent) {
-      if (activeActionId === action.id && isActionTrayOpen) {
-        setIsActionTrayOpen(false);
-      } else {
-        setIsActionTrayOpen(true);
-      }
+      setIsActionTrayOpen((prev) => (activeActionId === action.id ? !prev : true));
     } else if (action.onClick) {
       action.onClick();
       setIsActionTrayOpen(false);
@@ -191,11 +235,7 @@ export function VisuAlgoShell({
       action.onExecute?.({});
       setIsActionTrayOpen(false);
     } else {
-      if (activeActionId === action.id && isActionTrayOpen) {
-        setIsActionTrayOpen(false);
-      } else {
-        setIsActionTrayOpen(true);
-      }
+      setIsActionTrayOpen((prev) => (activeActionId === action.id ? !prev : true));
     }
   };
 
@@ -206,41 +246,98 @@ export function VisuAlgoShell({
     }
   };
 
-  // Resolve code string if object passed
-  const resolvedCodeString = React.useMemo(() => {
-    if (!code) return "";
-    if (typeof code === "string") return code;
-    const codeObj = code as Record<string, string | undefined>;
-    return codeObj[language] || codeObj["python"] || Object.values(codeObj)[0] || "";
-  }, [code, language]);
-
-  // Convert raw code string to code lines if provided
+  // Resolve code lines with full support for SourceCode { code, lines }, maps, and strings
   const resolvedCodeLines: VisuAlgoCodeLine[] = React.useMemo(() => {
     if (codeLines && codeLines.length > 0) return codeLines;
-    if (!resolvedCodeString) return [];
-    return resolvedCodeString.split("\n").map((text: string, idx: number) => ({
-      lineNumber: idx + 1,
-      text,
-      active: activeCodeLines.includes(idx + 1),
-    }));
-  }, [codeLines, resolvedCodeString, activeCodeLines]);
+    if (!code) return [];
+
+    // Case 1: Object with lines array (SourceCode) or record
+    if (typeof code === "object" && code !== null) {
+      const sourceCodeCandidate = code as {
+        code?: string;
+        lines?: Array<{ lineNumber?: number; content?: string; text?: string }>;
+      } & Record<string, string | undefined>;
+
+      if (Array.isArray(sourceCodeCandidate.lines) && sourceCodeCandidate.lines.length > 0) {
+        return sourceCodeCandidate.lines.map((l, idx: number) => {
+          const num = typeof l.lineNumber === "number" ? l.lineNumber : idx + 1;
+          const text = l.content ?? l.text ?? String(l);
+          return {
+            lineNumber: num,
+            text,
+            active: activeCodeLines.includes(num),
+          };
+        });
+      }
+      // Case 2: Object with raw .code string
+      if (typeof sourceCodeCandidate.code === "string") {
+        return sourceCodeCandidate.code.split("\n").map((text: string, idx: number) => ({
+          lineNumber: idx + 1,
+          text,
+          active: activeCodeLines.includes(idx + 1),
+        }));
+      }
+      // Case 3: Language-keyed dictionary: { python: "...", typescript: "..." }
+      if (typeof sourceCodeCandidate[language] === "string") {
+        const langStr = sourceCodeCandidate[language];
+        if (langStr) {
+          return langStr.split("\n").map((text: string, idx: number) => ({
+            lineNumber: idx + 1,
+            text,
+            active: activeCodeLines.includes(idx + 1),
+          }));
+        }
+      }
+      if (typeof sourceCodeCandidate["python"] === "string") {
+        const pyStr = sourceCodeCandidate["python"];
+        if (pyStr) {
+          return pyStr.split("\n").map((text: string, idx: number) => ({
+            lineNumber: idx + 1,
+            text,
+            active: activeCodeLines.includes(idx + 1),
+          }));
+        }
+      }
+      // Fallback first non-empty string in values
+      for (const val of Object.values(sourceCodeCandidate)) {
+        if (typeof val === "string" && val.length > 15) {
+          return val.split("\n").map((text: string, idx: number) => ({
+            lineNumber: idx + 1,
+            text,
+            active: activeCodeLines.includes(idx + 1),
+          }));
+        }
+      }
+    }
+
+    // Case 4: Plain string
+    if (typeof code === "string") {
+      return code.split("\n").map((text: string, idx: number) => ({
+        lineNumber: idx + 1,
+        text,
+        active: activeCodeLines.includes(idx + 1),
+      }));
+    }
+
+    return [];
+  }, [codeLines, code, language, activeCodeLines]);
 
   return (
     <div
       className={cn(
-        "relative w-full h-[calc(100vh-4rem)] flex flex-col bg-slate-50 dark:bg-[#060913] text-slate-900 dark:text-slate-100 select-none overflow-hidden transition-colors font-sans",
+        "relative w-full h-[calc(100vh-4rem)] flex flex-col bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 select-none overflow-hidden transition-colors font-sans",
         className
       )}
     >
       {/* 1. TOP SUB-HEADER: Algorithm Variants & Category Strip */}
-      <div className="shrink-0 h-10 px-4 sm:px-6 bg-white/90 dark:bg-[#0a0f1d]/90 border-b border-slate-200 dark:border-slate-850 flex items-center justify-between gap-3 text-xs font-mono backdrop-blur z-20">
+      <div className="shrink-0 h-11 px-4 sm:px-6 bg-white/95 dark:bg-[#0e1424]/95 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-xs font-mono backdrop-blur z-20">
         <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar">
           {category && (
-            <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-200 dark:border-cyan-900/60 shrink-0">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-900/60 shrink-0">
               {category}
             </span>
           )}
-          <span className="font-bold tracking-tight text-slate-800 dark:text-slate-200 shrink-0">
+          <span className="font-bold tracking-tight text-slate-900 dark:text-slate-100 shrink-0">
             {title}
           </span>
 
@@ -259,7 +356,7 @@ export function VisuAlgoShell({
                     className={cn(
                       "px-2.5 py-0.5 rounded-md text-[11px] font-semibold transition-all whitespace-nowrap cursor-pointer",
                       isActive
-                        ? "bg-cyan-600 text-white shadow-2xs dark:bg-cyan-500 dark:text-slate-950 font-bold"
+                        ? "bg-amber-500 text-slate-950 shadow-2xs font-bold hover:bg-amber-400"
                         : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
                     )}
                   >
@@ -289,9 +386,76 @@ export function VisuAlgoShell({
         </div>
       </div>
 
-      {/* 2. MAIN INTERACTIVE VISUALIZATION STAGE */}
-      <div className="relative flex-1 w-full h-full overflow-hidden flex items-center justify-center p-4 sm:p-6 lg:p-8">
-        {children}
+      {/* 1.5 DEDICATED PROMINENT MANUAL INPUT BAR */}
+      {(manualInput || fallbackCreateAction) && (
+        <div className="shrink-0 px-4 sm:px-6 py-1.5 bg-amber-500/5 dark:bg-amber-500/10 border-b border-amber-500/20 flex flex-wrap items-center justify-between gap-3 text-xs z-20 backdrop-blur">
+          <div className="flex items-center gap-2 flex-1 min-w-[280px] max-w-xl">
+            <span className="font-mono text-[11px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider whitespace-nowrap flex items-center gap-1">
+              <Sliders className="h-3.5 w-3.5 text-amber-500" />
+              <span>{manualInput?.label || "Input Data"}:</span>
+            </span>
+            <input
+              type="text"
+              value={manualInputValue}
+              onChange={(e) => setManualInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleManualInputSubmit();
+                }
+              }}
+              placeholder={
+                manualInput?.placeholder ||
+                "Enter custom data (e.g. 15, 42, 8, 23)"
+              }
+              data-testid="visualgo-manual-input"
+              className="flex-1 h-7 px-2.5 rounded-md text-xs font-mono bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+            />
+            <button
+              type="button"
+              onClick={() => handleManualInputSubmit()}
+              className="h-7 px-3 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono font-bold text-xs flex items-center gap-1 transition-colors shadow-2xs cursor-pointer shrink-0"
+            >
+              Load Data
+            </button>
+          </div>
+
+          {/* Quick Presets */}
+          {(manualInput?.presets || fallbackCreateAction?.presets) && (
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+              <span className="text-[10px] font-mono text-slate-400 uppercase">Presets:</span>
+              {(manualInput?.presets ||
+                fallbackCreateAction?.presets?.map((p) => ({
+                  label: p.label,
+                  value: String(Object.values(p.values)[0] ?? ""),
+                })) ||
+                []
+              ).map((preset, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setManualInputValue(preset.value);
+                    handleManualInputSubmit(preset.value);
+                  }}
+                  className="h-6 px-2 rounded text-[10px] font-mono bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 text-slate-700 dark:text-slate-300 hover:border-amber-500 hover:text-amber-600 dark:hover:text-amber-400 transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 2. MAIN INTERACTIVE VISUALIZATION STAGE WITH ZOOM & PAN */}
+      <main
+        className="relative flex-1 w-full h-full overflow-hidden flex items-center justify-center"
+        aria-label="Algorithm visualization canvas"
+      >
+        <ZoomableCanvas>
+          {children}
+        </ZoomableCanvas>
 
         {/* 3. TOP-LEFT FLOATING STATUS & E-LECTURE HUD */}
         <div
@@ -303,7 +467,7 @@ export function VisuAlgoShell({
           {isStatusCollapsed ? (
             <button
               onClick={() => setIsStatusCollapsed(false)}
-              className="px-3 py-1.5 rounded-xl bg-white/95 dark:bg-[#0c1220]/95 border border-slate-200 dark:border-slate-800 shadow-md backdrop-blur flex items-center gap-2 text-xs font-mono text-cyan-600 dark:text-cyan-400 hover:border-cyan-500 transition-colors cursor-pointer"
+              className="px-3 py-1.5 rounded-xl bg-white/95 dark:bg-[#0e1424]/95 border border-slate-200 dark:border-slate-800 shadow-md backdrop-blur flex items-center gap-2 text-xs font-mono text-amber-600 dark:text-amber-400 hover:border-amber-500 transition-colors cursor-pointer"
               title="Show Step Explanation"
             >
               <Sparkles className="h-3.5 w-3.5" />
@@ -311,12 +475,12 @@ export function VisuAlgoShell({
               <ChevronDown className="h-3 w-3 text-slate-400" />
             </button>
           ) : (
-            <div className="rounded-2xl border border-slate-200/90 dark:border-slate-800/90 bg-white/95 dark:bg-[#0c1220]/95 shadow-xl backdrop-blur-md overflow-hidden text-xs">
+            <div className="rounded-2xl border border-slate-200/90 dark:border-slate-800/90 bg-white/95 dark:bg-[#0e1424]/95 shadow-xl backdrop-blur-md overflow-hidden text-xs">
               {/* Header */}
-              <div className="px-3.5 py-2 border-b border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between bg-slate-50/70 dark:bg-[#080d1a]/70">
+              <div className="px-3.5 py-2 border-b border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between bg-slate-50/70 dark:bg-[#0a0f1d]/70">
                 <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-cyan-500" />
-                  <span className="font-mono font-bold uppercase tracking-wider text-[11px] text-cyan-700 dark:text-cyan-300">
+                  <div className="h-2 w-2 rounded-full bg-amber-500" />
+                  <span className="font-mono font-bold uppercase tracking-wider text-[11px] text-amber-700 dark:text-amber-400">
                     {effectiveAction}
                   </span>
                 </div>
@@ -337,7 +501,7 @@ export function VisuAlgoShell({
                   {effectiveExplanation}
                 </p>
                 {whyExplanation && (
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 italic border-l-2 border-cyan-500/40 pl-2">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 italic border-l-2 border-amber-500/40 pl-2">
                     {whyExplanation}
                   </p>
                 )}
@@ -347,16 +511,20 @@ export function VisuAlgoShell({
                   <div className="pt-2 border-t border-slate-100 dark:border-slate-850 flex items-center justify-between text-[10px] font-mono text-slate-500 dark:text-slate-400">
                     {effectiveTimeComplexity && (
                       <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3 text-cyan-500" />
+                        <Clock className="h-3 w-3 text-amber-500" />
                         <span>Time:</span>
-                        <strong className="text-slate-800 dark:text-slate-200">{effectiveTimeComplexity}</strong>
+                        <strong className="text-slate-800 dark:text-slate-200">
+                          {effectiveTimeComplexity}
+                        </strong>
                       </span>
                     )}
                     {spaceComplexity && (
                       <span className="flex items-center gap-1">
-                        <Layers className="h-3 w-3 text-cyan-500" />
+                        <Layers className="h-3 w-3 text-amber-500" />
                         <span>Space:</span>
-                        <strong className="text-slate-800 dark:text-slate-200">{spaceComplexity}</strong>
+                        <strong className="text-slate-800 dark:text-slate-200">
+                          {spaceComplexity}
+                        </strong>
                       </span>
                     )}
                   </div>
@@ -367,29 +535,29 @@ export function VisuAlgoShell({
         </div>
 
         {/* 4. BOTTOM-RIGHT COLLAPSIBLE CODE / PSEUDOCODE HUD */}
-        {(resolvedCodeString || resolvedCodeLines.length > 0) && (
+        {resolvedCodeLines.length > 0 && (
           <div
             className={cn(
-              "absolute bottom-20 sm:bottom-4 right-4 z-30 transition-all duration-200 w-full sm:w-[380px] max-w-[calc(100vw-2rem)]",
+              "absolute bottom-20 sm:bottom-6 right-4 z-30 transition-all duration-200 w-full sm:w-[380px] max-w-[calc(100vw-2rem)]",
               isCodeCollapsed && "w-auto sm:w-auto"
             )}
           >
             {isCodeCollapsed ? (
               <button
                 onClick={() => setIsCodeCollapsed(false)}
-                className="px-3 py-2 rounded-xl bg-white/95 dark:bg-[#0c1220]/95 border border-slate-200 dark:border-slate-800 shadow-md backdrop-blur flex items-center gap-2 text-xs font-mono text-slate-700 dark:text-slate-300 hover:border-cyan-500 transition-colors cursor-pointer"
+                className="px-3 py-2 rounded-xl bg-white/95 dark:bg-[#0e1424]/95 border border-slate-200 dark:border-slate-800 shadow-md backdrop-blur flex items-center gap-2 text-xs font-mono text-slate-700 dark:text-slate-300 hover:border-amber-500 transition-colors cursor-pointer"
                 title="Show Algorithm Code"
               >
-                <Code2 className="h-3.5 w-3.5 text-cyan-500" />
+                <Code2 className="h-3.5 w-3.5 text-amber-500" />
                 <span>Code HUD</span>
                 <ChevronUp className="h-3 w-3 text-slate-400" />
               </button>
             ) : (
-              <div className="rounded-2xl border border-slate-200/90 dark:border-slate-800/90 bg-white/95 dark:bg-[#0c1220]/95 shadow-xl backdrop-blur-md overflow-hidden text-xs flex flex-col max-h-[300px] sm:max-h-[360px]">
+              <div className="rounded-2xl border border-slate-200/90 dark:border-slate-800/90 bg-white/95 dark:bg-[#0e1424]/95 shadow-xl backdrop-blur-md overflow-hidden text-xs flex flex-col max-h-[280px] sm:max-h-[340px]">
                 {/* Header */}
-                <div className="px-3.5 py-2 border-b border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between bg-slate-50/70 dark:bg-[#080d1a]/70 shrink-0">
+                <div className="px-3.5 py-2 border-b border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between bg-slate-50/70 dark:bg-[#0a0f1d]/70 shrink-0">
                   <div className="flex items-center gap-2 font-mono">
-                    <Code2 className="h-3.5 w-3.5 text-cyan-500" />
+                    <Code2 className="h-3.5 w-3.5 text-amber-500" />
                     <span className="font-bold text-slate-800 dark:text-slate-200 text-[11px] uppercase tracking-wider">
                       Execution Code
                     </span>
@@ -400,7 +568,7 @@ export function VisuAlgoShell({
                       <select
                         value={language}
                         onChange={(e) => onLanguageChange(e.target.value as SupportedLanguage)}
-                        className="h-5 px-1 text-[10px] font-mono bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-slate-700 dark:text-slate-300 focus:outline-none focus:border-cyan-500 cursor-pointer"
+                        className="h-5 px-1 text-[10px] font-mono bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-slate-700 dark:text-slate-300 focus:outline-none focus:border-amber-500 cursor-pointer"
                       >
                         <option value="python">Python</option>
                         <option value="typescript">TypeScript</option>
@@ -420,7 +588,7 @@ export function VisuAlgoShell({
                 </div>
 
                 {/* Code Lines Container */}
-                <div className="p-2 overflow-y-auto font-mono text-[11px] leading-5 divide-y divide-transparent">
+                <div className="p-2 overflow-y-auto font-mono text-[11px] leading-5 divide-y divide-transparent max-h-[260px]">
                   {resolvedCodeLines.map((line) => {
                     const isActive = line.active || activeCodeLines.includes(line.lineNumber);
                     return (
@@ -429,11 +597,11 @@ export function VisuAlgoShell({
                         className={cn(
                           "px-2 py-0.5 rounded flex items-center gap-3 transition-colors",
                           isActive
-                            ? "bg-cyan-500/15 text-cyan-800 dark:text-cyan-300 font-bold border-l-2 border-cyan-500 pl-2 shadow-xs"
+                            ? "bg-amber-500/15 text-amber-800 dark:text-amber-300 font-bold border-l-2 border-amber-500 pl-2 shadow-2xs"
                             : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                         )}
                       >
-                        <span className="text-[10px] text-slate-400 w-5 text-right shrink-0 select-none">
+                        <span className="text-[10px] text-slate-400 w-5 text-right shrink-0 select-none font-mono">
                           {line.lineNumber}
                         </span>
                         <span className="whitespace-pre overflow-x-auto">{line.text}</span>
@@ -445,10 +613,10 @@ export function VisuAlgoShell({
             )}
           </div>
         )}
-      </div>
+      </main>
 
       {/* 5. VISUALGO BOTTOM HUD: Action Menu (Left) + Media Controller (Center) */}
-      <div className="shrink-0 p-3 sm:p-4 bg-white/95 dark:bg-[#070b14]/95 border-t border-slate-200 dark:border-slate-850 flex flex-col md:flex-row items-center justify-between gap-3 z-30 shadow-lg backdrop-blur">
+      <div className="shrink-0 p-3 sm:p-4 bg-white/95 dark:bg-[#0a0f1d]/95 border-t border-slate-200 dark:border-slate-850 flex flex-col md:flex-row items-center justify-between gap-3 z-30 shadow-lg backdrop-blur">
         {/* ============================================================ */}
         {/* BOTTOM-LEFT: VISUALGO ACTION MENU DOCK                       */}
         {/* ============================================================ */}
@@ -465,10 +633,10 @@ export function VisuAlgoShell({
                 className={cn(
                   "px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed",
                   isSelected && isActionTrayOpen
-                    ? "bg-cyan-600 text-white dark:bg-cyan-500 dark:text-slate-950 shadow-md ring-2 ring-cyan-500/30"
+                    ? "bg-amber-500 text-slate-950 dark:bg-amber-500 dark:text-slate-950 shadow-md ring-2 ring-amber-500/30"
                     : isSelected
-                    ? "bg-slate-200 dark:bg-slate-800 text-cyan-700 dark:text-cyan-300 border border-cyan-500/40"
-                    : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800"
+                    ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/40"
+                    : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:border-amber-500/40"
                 )}
                 title={action.description || action.label}
               >
@@ -478,12 +646,12 @@ export function VisuAlgoShell({
             );
           })}
 
-          {/* Action Parameter Popover Tray (Pops up directly above actions) */}
+          {/* Action Parameter Popover Tray */}
           {isActionTrayOpen && activeAction && (
-            <div className="absolute bottom-full left-0 mb-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1220] shadow-2xl backdrop-blur-md flex flex-col gap-2.5 z-40 min-w-[280px] max-w-[340px] animate-in fade-in slide-in-from-bottom-2 duration-150">
+            <div className="absolute bottom-full left-0 mb-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0e1424] shadow-2xl backdrop-blur-md flex flex-col gap-2.5 z-40 min-w-[280px] max-w-[340px] animate-in fade-in slide-in-from-bottom-2 duration-150">
               <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 dark:border-slate-850">
                 <span className="font-mono font-bold text-xs text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                  <Zap className="h-3.5 w-3.5 text-cyan-500" />
+                  <Zap className="h-3.5 w-3.5 text-amber-500" />
                   <span>{activeAction.label}</span>
                 </span>
                 <button
@@ -510,7 +678,7 @@ export function VisuAlgoShell({
                             onChange={(e) =>
                               setParamValues((prev) => ({ ...prev, [param.name]: e.target.value }))
                             }
-                            className="h-7 px-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-slate-800 dark:text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                            className="h-7 px-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-slate-800 dark:text-slate-200 text-xs focus:outline-none focus:border-amber-500"
                           >
                             {param.options.map((opt) => (
                               <option key={opt.value} value={opt.value}>
@@ -532,7 +700,7 @@ export function VisuAlgoShell({
                                   param.type === "number" ? Number(e.target.value) : e.target.value,
                               }))
                             }
-                            className="h-7 px-2 w-32 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-slate-800 dark:text-slate-200 text-xs font-mono focus:outline-none focus:border-cyan-500"
+                            className="h-7 px-2 w-32 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-slate-800 dark:text-slate-200 text-xs font-mono focus:outline-none focus:border-amber-500"
                           />
                         )}
                       </div>
@@ -559,7 +727,7 @@ export function VisuAlgoShell({
                   {/* Execute / Go Button */}
                   <button
                     onClick={handleExecute}
-                    className="w-full h-8 mt-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-mono font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-98 cursor-pointer"
+                    className="w-full h-8 mt-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-98 cursor-pointer"
                   >
                     <Play className="h-3.5 w-3.5 fill-current" />
                     <span>Go</span>
@@ -610,7 +778,7 @@ export function VisuAlgoShell({
               <button
                 onClick={onPlay}
                 disabled={totalSteps <= 1}
-                className="h-7 px-3 rounded bg-cyan-600 hover:bg-cyan-500 text-white font-bold font-mono text-xs flex items-center gap-1 shadow-xs transition-colors cursor-pointer disabled:opacity-40"
+                className="h-7 px-3 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold font-mono text-xs flex items-center gap-1 shadow-xs transition-colors cursor-pointer disabled:opacity-40"
                 title="Play Execution"
                 aria-label="Play Execution"
               >
@@ -640,8 +808,8 @@ export function VisuAlgoShell({
             </button>
           </div>
 
-          {/* Step Scrubber & Counter */}
-          <div className="flex items-center gap-2 px-2 min-w-[140px] sm:min-w-[180px]">
+          {/* Step Counter */}
+          <div className="flex items-center gap-2 px-2">
             <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
               <strong className="text-slate-800 dark:text-slate-200">
                 {totalSteps > 0 ? currentStep + 1 : 0}
@@ -656,7 +824,7 @@ export function VisuAlgoShell({
               value={currentStep}
               onChange={(e) => onSeek(Number(e.target.value))}
               disabled={totalSteps <= 1}
-              className="w-24 sm:w-28 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-600 disabled:opacity-40"
+              className="sr-only"
               aria-label="Timeline scrubber"
             />
           </div>
@@ -670,7 +838,7 @@ export function VisuAlgoShell({
                 className={cn(
                   "px-2 py-0.5 text-[10px] font-mono rounded transition-colors cursor-pointer",
                   speed === s
-                    ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 font-bold shadow-2xs"
+                    ? "bg-amber-500 text-slate-950 font-bold shadow-2xs"
                     : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
                 )}
               >

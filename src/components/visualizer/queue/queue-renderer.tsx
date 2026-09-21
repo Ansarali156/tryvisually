@@ -8,7 +8,7 @@ import type {
 import type { PlaybackSpeed } from "@/core/execution/types";
 import type { QueueState, QueueVariant } from "@/core/queue/types";
 import { useVisualizationAnimation } from "@/core/animation/hooks/use-visualization-animation";
-import { getElementInterpolatedStyle } from "@/core/animation/renderer/animation-renderer";
+import { getElementFlowStyle } from "@/core/animation/renderer/animation-renderer";
 import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp, CornerDownLeft, Layers } from "lucide-react";
 
@@ -92,7 +92,7 @@ export function QueueRenderer({
           const slotIndex = (element.metadata?.slotIndex as number) ?? index;
           const highlight = resolvedHighlights?.get(element.id);
           const interpolated = interpolatedTransforms.get(element.id);
-          const dynamicStyle = getElementInterpolatedStyle(interpolated, element.position);
+          const dynamicStyle = getElementFlowStyle(interpolated, element.position);
 
           const getElementStyles = () => {
             if (!isOccupied) {

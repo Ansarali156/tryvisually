@@ -279,6 +279,26 @@ export function TreeVisualizerShell({
       ]}
       activeSubVariant={mode}
       onSelectSubVariant={(id) => handleModeChange(id as TreeMode)}
+      manualInput={{
+        label: "Tree Nodes",
+        placeholder: "e.g. 50, 30, 70, 20, 40, 60, 80",
+        defaultValue: "50, 30, 70, 20, 40, 60, 80",
+        onSubmit: (val) => {
+          const matches = val.match(/-?\d+/g);
+          const parsed = matches ? matches.map((m) => parseInt(m, 10)).filter((n) => !isNaN(n)) : [];
+          if (parsed.length > 0) {
+            const newTree = buildBSTFromValues(parsed.slice(0, 15));
+            setTreeState(newTree);
+            setMode("bst");
+            executeOp("search", { target: parsed[0] });
+          }
+        },
+        presets: [
+          { label: "Balanced BST", value: "50, 30, 70, 20, 40, 60, 80" },
+          { label: "Skewed", value: "10, 20, 30, 40, 50" },
+          { label: "Random 7", value: "45, 15, 75, 10, 25, 65, 90" },
+        ],
+      }}
       actions={actions}
       statusBadge={
         engine.isPlaying

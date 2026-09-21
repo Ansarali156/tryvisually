@@ -70,7 +70,7 @@ export function HeapTreeCanvas({
       >
         <defs>
           <filter id="glow-heap-highlight" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#38bdf8" floodOpacity="0.8" />
+            <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#f59e0b" floodOpacity="0.8" />
           </filter>
         </defs>
 
@@ -99,7 +99,7 @@ export function HeapTreeCanvas({
                       y1={parentPos.y}
                       x2={childPos.x}
                       y2={childPos.y}
-                      stroke={isHighlighted ? "#38bdf8" : "hsl(var(--border))"}
+                      stroke={isHighlighted ? "#f59e0b" : "hsl(var(--border))"}
                       strokeWidth={isHighlighted ? 3 : 2}
                       strokeDasharray={isHighlighted ? "4 2" : undefined}
                       className="transition-all duration-300"
@@ -109,13 +109,13 @@ export function HeapTreeCanvas({
                       cx={(parentPos.x * 2 + childPos.x) / 3}
                       cy={(parentPos.y * 2 + childPos.y) / 3}
                       r={7}
-                      className="fill-background stroke-border stroke-1"
+                      className="fill-white dark:fill-slate-900 stroke-slate-300 dark:stroke-slate-700 stroke-1"
                     />
                     <text
                       x={(parentPos.x * 2 + childPos.x) / 3}
                       y={(parentPos.y * 2 + childPos.y) / 3 + 3}
                       textAnchor="middle"
-                      className="text-[9px] font-mono fill-muted-foreground select-none"
+                      className="text-[9px] font-mono fill-slate-500 select-none"
                     >
                       L
                     </text>
@@ -138,7 +138,7 @@ export function HeapTreeCanvas({
                       y1={parentPos.y}
                       x2={childPos.x}
                       y2={childPos.y}
-                      stroke={isHighlighted ? "#38bdf8" : "hsl(var(--border))"}
+                      stroke={isHighlighted ? "#f59e0b" : "hsl(var(--border))"}
                       strokeWidth={isHighlighted ? 3 : 2}
                       strokeDasharray={isHighlighted ? "4 2" : undefined}
                       className="transition-all duration-300"
@@ -148,13 +148,13 @@ export function HeapTreeCanvas({
                       cx={(parentPos.x * 2 + childPos.x) / 3}
                       cy={(parentPos.y * 2 + childPos.y) / 3}
                       r={7}
-                      className="fill-background stroke-border stroke-1"
+                      className="fill-white dark:fill-slate-900 stroke-slate-300 dark:stroke-slate-700 stroke-1"
                     />
                     <text
                       x={(parentPos.x * 2 + childPos.x) / 3}
                       y={(parentPos.y * 2 + childPos.y) / 3 + 3}
                       textAnchor="middle"
-                      className="text-[9px] font-mono fill-muted-foreground select-none"
+                      className="text-[9px] font-mono fill-slate-500 select-none"
                     >
                       R
                     </text>
@@ -187,7 +187,7 @@ export function HeapTreeCanvas({
                   <circle
                     r={HEAP_NODE_RADIUS + 5}
                     fill="none"
-                    stroke="#38bdf8"
+                    stroke="#f59e0b"
                     strokeWidth={2.5}
                     strokeDasharray="4 2"
                     className="animate-spin-slow"
@@ -200,10 +200,10 @@ export function HeapTreeCanvas({
                   className={cn(
                     "transition-colors duration-300",
                     isHighlighted
-                      ? "fill-primary text-primary-foreground stroke-primary"
+                      ? "fill-amber-500 stroke-amber-600"
                       : isRoot
-                      ? "fill-card stroke-primary/80 stroke-2"
-                      : "fill-card stroke-border stroke-2 hover:stroke-foreground/50"
+                      ? "fill-white dark:fill-slate-900 stroke-amber-500 stroke-2"
+                      : "fill-white dark:fill-slate-900 stroke-slate-300 dark:stroke-slate-700 stroke-2 hover:stroke-slate-400"
                   )}
                   filter={isHighlighted ? "url(#glow-heap-highlight)" : undefined}
                 />
@@ -214,7 +214,7 @@ export function HeapTreeCanvas({
                   dy="0.35em"
                   className={cn(
                     "text-sm font-semibold select-none transition-colors",
-                    isHighlighted ? "fill-primary-foreground" : "fill-foreground font-mono"
+                    isHighlighted ? "fill-slate-950 font-bold" : "fill-slate-900 dark:fill-slate-100 font-mono"
                   )}
                 >
                   {item.value}

@@ -291,12 +291,12 @@ export function ArrayVisualizerShell({
       ],
       onExecute: (params) => {
         const val = String(params.input ?? "");
-        const parsed = val
-          .split(",")
-          .map((s: string) => parseInt(s.trim(), 10))
-          .filter((n: number) => !isNaN(n));
+        const matches = val.match(/-?\d+/g);
+        const parsed = matches ? matches.map((m) => parseInt(m, 10)).filter((n) => !isNaN(n)) : [];
         if (parsed.length > 0) {
-          setArrayValues(parsed);
+          setArrayValues(parsed.slice(0, 30));
+          setCurrentOperation("bubble-sort");
+          setCurrentParams({});
           engine.reset();
         }
       },
@@ -342,6 +342,27 @@ export function ArrayVisualizerShell({
       title="Array Visualizer"
       category="Data Structures"
       subVariants={subVariants}
+      manualInput={{
+        label: "Array",
+        placeholder: "e.g. 15, 42, 8, 23, 71",
+        defaultValue: arrayValues.join(", "),
+        onSubmit: (val) => {
+          const matches = val.match(/-?\d+/g);
+          const parsed = matches ? matches.map((m) => parseInt(m, 10)).filter((n) => !isNaN(n)) : [];
+          if (parsed.length > 0) {
+            setArrayValues(parsed.slice(0, 30));
+            setCurrentOperation("bubble-sort");
+            setCurrentParams({});
+            engine.reset();
+          }
+        },
+        presets: [
+          { label: "Default", value: "15, 42, 8, 23, 71, 36, 19, 5" },
+          { label: "Random 8", value: Array.from({ length: 8 }, () => Math.floor(Math.random() * 85) + 10).join(", ") },
+          { label: "Sorted", value: "10, 20, 30, 40, 50, 60, 70, 80" },
+          { label: "Reversed", value: "80, 70, 60, 50, 40, 30, 20, 10" },
+        ],
+      }}
       currentAction={engine.currentStep?.operation || "Ready"}
       stepExplanation={engine.currentStep?.explanation || "Select an array operation to execute."}
       whyExplanation={undefined}

@@ -69,10 +69,10 @@ export function TreeCanvas({
             refY="3"
             orient="auto"
           >
-            <polygon points="0 0, 6 3, 0 6" className="fill-muted-foreground/60" />
+            <polygon points="0 0, 6 3, 0 6" className="fill-slate-400 dark:fill-slate-500" />
           </marker>
           <filter id="glow-primary" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="hsl(var(--primary))" floodOpacity="0.6" />
+            <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#f59e0b" floodOpacity="0.6" />
           </filter>
           <filter id="glow-success" x="-20%" y="-20%" width="140%" height="140%">
             <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#10b981" floodOpacity="0.7" />
@@ -85,7 +85,7 @@ export function TreeCanvas({
             const parentPos = positions[node.id];
             if (!parentPos) return null;
 
-            const edges: React.ReactNode[] = [];
+            const edges = [];
 
             // Left Child Edge
             if (node.leftId && positions[node.leftId]) {
@@ -110,8 +110,8 @@ export function TreeCanvas({
                     className={cn(
                       "transition-all duration-300 stroke-2",
                       isHighlighted
-                        ? "stroke-primary stroke-[3]"
-                        : "stroke-border hover:stroke-muted-foreground/80"
+                        ? "stroke-amber-500 stroke-[3]"
+                        : "stroke-slate-300 dark:stroke-slate-700 hover:stroke-slate-400"
                     )}
                     markerEnd="url(#arrowhead)"
                   />
@@ -119,7 +119,7 @@ export function TreeCanvas({
                   <text
                     x={(startX + endX) / 2 - 10}
                     y={(startY + endY) / 2}
-                    className="text-[10px] fill-muted-foreground font-mono font-medium"
+                    className="text-[10px] fill-slate-400 font-mono font-medium"
                   >
                     L
                   </text>
@@ -149,8 +149,8 @@ export function TreeCanvas({
                     className={cn(
                       "transition-all duration-300 stroke-2",
                       isHighlighted
-                        ? "stroke-primary stroke-[3]"
-                        : "stroke-border hover:stroke-muted-foreground/80"
+                        ? "stroke-amber-500 stroke-[3]"
+                        : "stroke-slate-300 dark:stroke-slate-700 hover:stroke-slate-400"
                     )}
                     markerEnd="url(#arrowhead)"
                   />
@@ -158,7 +158,7 @@ export function TreeCanvas({
                   <text
                     x={(startX + endX) / 2 + 10}
                     y={(startY + endY) / 2}
-                    className="text-[10px] fill-muted-foreground font-mono font-medium"
+                    className="text-[10px] fill-slate-400 font-mono font-medium"
                   >
                     R
                   </text>
@@ -193,7 +193,7 @@ export function TreeCanvas({
                     cx={pos.x}
                     cy={pos.y}
                     r={NODE_RADIUS + 6}
-                    className="fill-none stroke-primary/50 stroke-2 animate-pulse"
+                    className="fill-none stroke-amber-500/50 stroke-2 animate-pulse"
                     filter="url(#glow-primary)"
                   />
                 )}
@@ -206,10 +206,10 @@ export function TreeCanvas({
                   className={cn(
                     "transition-colors duration-200 stroke-2",
                     isHighlighted
-                      ? "fill-primary text-primary-foreground stroke-primary"
+                      ? "fill-amber-500 stroke-amber-600"
                       : isRoot
-                      ? "fill-primary/10 stroke-primary/80"
-                      : "fill-card stroke-border hover:stroke-primary/50"
+                      ? "fill-white dark:fill-slate-900 stroke-amber-500 stroke-2"
+                      : "fill-white dark:fill-slate-900 stroke-slate-300 dark:stroke-slate-700 hover:stroke-amber-500/70"
                   )}
                 />
 
@@ -220,7 +220,7 @@ export function TreeCanvas({
                   textAnchor="middle"
                   className={cn(
                     "text-sm font-semibold font-mono pointer-events-none",
-                    isHighlighted ? "fill-primary-foreground font-bold" : "fill-foreground"
+                    isHighlighted ? "fill-slate-950 font-bold" : "fill-slate-900 dark:fill-slate-100"
                   )}
                 >
                   {node.value}
@@ -233,13 +233,13 @@ export function TreeCanvas({
                       width="32"
                       height="14"
                       rx="3"
-                      className="fill-primary/20 stroke-primary/40 stroke-[1]"
+                      className="fill-amber-500/20 stroke-amber-500/40 stroke-[1]"
                     />
                     <text
                       x="16"
                       y="10"
                       textAnchor="middle"
-                      className="text-[9px] font-bold font-mono fill-primary"
+                      className="text-[9px] font-mono fill-amber-600 dark:fill-amber-400 font-bold select-none"
                     >
                       ROOT
                     </text>
@@ -247,18 +247,18 @@ export function TreeCanvas({
                 )}
 
                 {isLeaf && !isRoot && (
-                  <g transform={`translate(${pos.x - 14}, ${pos.y + NODE_RADIUS + 4})`}>
+                  <g transform={`translate(${pos.x - 16}, ${pos.y + NODE_RADIUS + 4})`}>
                     <rect
-                      width="28"
-                      height="13"
+                      width="32"
+                      height="14"
                       rx="3"
-                      className="fill-muted stroke-border/60 stroke-[1]"
+                      className="fill-slate-100 dark:fill-slate-800 stroke-slate-300 dark:stroke-slate-700 stroke-[1]"
                     />
                     <text
-                      x="14"
-                      y="9.5"
+                      x="16"
+                      y="10"
                       textAnchor="middle"
-                      className="text-[8px] font-semibold font-mono fill-muted-foreground"
+                      className="text-[9px] font-mono fill-slate-500 select-none"
                     >
                       LEAF
                     </text>

@@ -228,11 +228,11 @@ export function VisualizerShell({
 
   const statusColors = {
     default: "bg-white border-slate-300 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200",
-    active: "bg-cyan-600 border-cyan-500 text-white shadow-lg scale-110 ring-4 ring-cyan-500/30",
-    comparing: "bg-amber-400 border-amber-500 text-slate-900 font-bold shadow-lg scale-105 ring-4 ring-amber-500/30",
+    active: "bg-amber-500 border-amber-600 text-slate-950 font-bold shadow-lg scale-110 ring-4 ring-amber-500/30",
+    comparing: "bg-amber-400 border-amber-500 text-slate-950 font-bold shadow-lg scale-105 ring-4 ring-amber-500/30",
     swapping: "bg-rose-500 border-rose-600 text-white shadow-md scale-105",
     sorted: "bg-emerald-500 border-emerald-600 text-white font-bold shadow-md",
-    visited: "bg-sky-100 border-sky-400 text-sky-900 dark:bg-sky-950 dark:text-sky-200",
+    visited: "bg-amber-100 border-amber-400 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200",
     inserted: "bg-emerald-100 border-emerald-400 text-emerald-900",
     deleted: "bg-rose-100 border-rose-400 text-rose-900 line-through opacity-50",
   };
@@ -277,7 +277,7 @@ export function VisualizerShell({
             return (
               <div key={node.id} className="flex flex-col items-center gap-1.5">
                 {/* Pointer indicator */}
-                <div className="h-5 text-xs font-mono font-bold text-cyan-600 dark:text-cyan-400">
+                <div className="h-5 text-xs font-mono font-bold text-amber-600 dark:text-amber-400">
                   {pointer?.label || " "}
                 </div>
 
@@ -303,7 +303,7 @@ export function VisualizerShell({
         {/* Legend */}
         <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-mono text-slate-500 dark:text-slate-400">
           <div className="flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded bg-cyan-600" />
+            <span className="h-3 w-3 rounded bg-amber-500" />
             <span>Target / Match</span>
           </div>
           <div className="flex items-center gap-1.5">

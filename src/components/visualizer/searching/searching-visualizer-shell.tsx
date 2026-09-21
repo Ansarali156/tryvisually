@@ -186,6 +186,22 @@ export function SearchingVisualizerShell({
             : generateLinearSearchTrace(currentArray, targetValue);
         setTrace(newTrace);
       }}
+      manualInput={{
+        label: "Array",
+        placeholder: "e.g. 14, 28, 33, 42, 57, 65, 76, 89",
+        defaultValue: arrayInput,
+        onSubmit: (val) => {
+          setArrayInput(val);
+          const matches = val.match(/-?\d+/g);
+          const parsed = matches ? matches.map((m) => parseInt(m, 10)).filter((n) => !isNaN(n)) : [];
+          const finalArr = parsed.length > 0 ? parsed.slice(0, 20) : DEFAULT_ARRAY;
+          runSearch(targetValue, finalArr);
+        },
+        presets: [
+          { label: "Default", value: DEFAULT_ARRAY.join(", ") },
+          { label: "Random 8", value: Array.from({ length: 8 }, () => Math.floor(Math.random() * 90) + 10).sort((a, b) => a - b).join(", ") },
+        ],
+      }}
       actions={actions}
       statusBadge={
         runtimeState?.foundIndex !== null && runtimeState?.foundIndex !== undefined

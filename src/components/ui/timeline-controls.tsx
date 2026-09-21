@@ -134,8 +134,8 @@ export function TimelineControls({
         </Button>
       </div>
 
-      {/* Scrubber / Progress Step Slider */}
-      <div className="flex-1 min-w-[160px] flex items-center gap-3 px-2">
+      {/* Step Counter */}
+      <div className="flex items-center gap-3 px-2">
         <span className="text-xs font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
           Step <span className="font-semibold text-slate-800 dark:text-slate-200">{totalSteps > 0 ? currentStep + 1 : 0}</span> / {totalSteps}
         </span>
@@ -146,7 +146,7 @@ export function TimelineControls({
           value={currentStep}
           onChange={(e) => onSeek(Number(e.target.value))}
           disabled={totalSteps <= 1}
-          className="w-full h-1.5 bg-slate-200 dark:bg-surface-800 rounded-lg appearance-none cursor-pointer accent-brand-600 disabled:opacity-40"
+          className="sr-only"
           aria-label="Execution timeline scrubber"
         />
       </div>

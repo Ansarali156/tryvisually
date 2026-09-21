@@ -127,11 +127,9 @@ export function SortingVisualizerShell({
       onExecute: (params) => {
         const val = String(params.input ?? arrayInput);
         setArrayInput(val);
-        const parsed = val
-          .split(",")
-          .map((s: string) => parseInt(s.trim(), 10))
-          .filter((n: number) => !isNaN(n));
-        const finalArr = parsed.length > 0 ? parsed : DEFAULT_ARRAY;
+        const matches = val.match(/-?\d+/g);
+        const parsed = matches ? matches.map((m) => parseInt(m, 10)).filter((n) => !isNaN(n)) : [];
+        const finalArr = parsed.length > 0 ? parsed.slice(0, 20) : DEFAULT_ARRAY;
         setTrace(createTrace(algorithm, finalArr));
       },
     },
@@ -155,6 +153,23 @@ export function SortingVisualizerShell({
       title="Sorting Visualizer"
       category="Sorting Algorithms"
       subVariants={subVariants}
+      manualInput={{
+        label: "Array",
+        placeholder: "e.g. 48, 15, 82, 36, 64, 21",
+        defaultValue: arrayInput,
+        onSubmit: (val) => {
+          setArrayInput(val);
+          const matches = val.match(/-?\d+/g);
+          const parsed = matches ? matches.map((m) => parseInt(m, 10)).filter((n) => !isNaN(n)) : [];
+          const finalArr = parsed.length > 0 ? parsed.slice(0, 20) : DEFAULT_ARRAY;
+          setTrace(createTrace(algorithm, finalArr));
+        },
+        presets: [
+          { label: "Random 8", value: [34, 12, 89, 55, 23, 76, 45, 91].join(", ") },
+          { label: "Nearly Sorted", value: [10, 20, 40, 30, 50, 60, 80, 70].join(", ") },
+          { label: "Reversed", value: [90, 80, 70, 60, 50, 40, 30, 20].join(", ") },
+        ],
+      }}
       currentAction={runtimeState?.phaseDescription || `${currentAlgoObj.name}`}
       stepExplanation={currentStep?.explanation || `Ready to sort ${currentArray.length} elements using ${currentAlgoObj.name}.`}
       whyExplanation={undefined}
@@ -207,7 +222,7 @@ export function SortingVisualizerShell({
                       ? "bg-amber-400 text-slate-950 ring-4 ring-amber-500/40 scale-105"
                       : isSorted
                       ? "bg-emerald-500 text-white shadow-emerald-500/20"
-                      : "bg-cyan-600 hover:bg-cyan-500 text-white dark:bg-cyan-700 dark:hover:bg-cyan-600"
+                      : "bg-slate-300 hover:bg-amber-500/80 text-slate-900 dark:bg-slate-700 dark:hover:bg-amber-500/80 dark:text-slate-100"
                   )}
                 >
                   <span className="text-[11px] drop-shadow-xs font-bold">{val}</span>

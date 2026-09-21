@@ -170,12 +170,10 @@ export function HeapVisualizerShell({
           />
           <button
             onClick={() => {
-              const vals = buildVal
-                .split(",")
-                .map((s) => parseInt(s.trim(), 10))
-                .filter((n) => !isNaN(n));
+              const matches = buildVal.match(/-?\d+/g);
+              const vals = matches ? matches.map((m) => parseInt(m, 10)).filter((n) => !isNaN(n)) : [];
               if (vals.length > 0) {
-                executeOp("build-heap", { values: vals });
+                executeOp("build-heap", { values: vals.slice(0, 15) });
               }
             }}
             className="px-3 py-1 text-xs font-bold bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors w-full"
@@ -205,6 +203,24 @@ export function HeapVisualizerShell({
       ]}
       activeSubVariant={heapType}
       onSelectSubVariant={(id) => handleHeapTypeChange(id as HeapType)}
+      manualInput={{
+        label: "Heap Items",
+        placeholder: "e.g. 45, 12, 89, 34, 23, 7",
+        defaultValue: buildVal,
+        onSubmit: (val) => {
+          setBuildVal(val);
+          const matches = val.match(/-?\d+/g);
+          const parsed = matches ? matches.map((m) => parseInt(m, 10)).filter((n) => !isNaN(n)) : [];
+          if (parsed.length > 0) {
+            executeOp("build-heap", { values: parsed.slice(0, 15) });
+          }
+        },
+        presets: [
+          { label: "Sample 6", value: "45, 12, 89, 34, 23, 7" },
+          { label: "Ascending", value: "10, 20, 30, 40, 50, 60" },
+          { label: "Descending", value: "90, 80, 70, 60, 50, 40" },
+        ],
+      }}
       actions={actions}
       statusBadge={
         engine.isPlaying

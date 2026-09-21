@@ -8,7 +8,7 @@ import type {
 import type { PlaybackSpeed } from "@/core/execution/types";
 import type { ArrayState } from "@/core/array/types";
 import { useVisualizationAnimation } from "@/core/animation/hooks/use-visualization-animation";
-import { getElementInterpolatedStyle } from "@/core/animation/renderer/animation-renderer";
+import { getElementFlowStyle } from "@/core/animation/renderer/animation-renderer";
 import { cn } from "@/lib/utils";
 import { ArrowDown, Layers } from "lucide-react";
 
@@ -75,7 +75,7 @@ export function ArrayRenderer({
           const rawIndex = (element.metadata?.index as number) ?? 0;
           const highlight = resolvedHighlights?.get(element.id);
           const interpolated = interpolatedTransforms.get(element.id);
-          const dynamicStyle = getElementInterpolatedStyle(interpolated, element.position);
+          const dynamicStyle = getElementFlowStyle(interpolated, element.position);
           const pointers = pointersByElementId.get(element.id) || [];
           const isHighlighted = !!highlight;
 

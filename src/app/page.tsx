@@ -490,8 +490,8 @@ export default function VisualiseHomePage() {
     <AppShell>
       <div className="w-full bg-surface-50 dark:bg-surface-950 flex-1 py-6 sm:py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          {/* Framed Container Box as drawn in wireframe */}
-          <div className="rounded-2xl border-2 border-slate-300 dark:border-slate-700 bg-white/95 dark:bg-surface-900/90 p-5 sm:p-7 lg:p-8 shadow-xs space-y-6">
+          {/* Borderless Container matching clean UI requirements */}
+          <div className="space-y-6">
             {/* Top Toolbar inside Container */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
               {/* Category Filter Chips */}
