@@ -1,8 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type {
   TreeMode,
@@ -22,21 +20,9 @@ import { useExecutionEngine } from "@/core/execution/hooks/use-execution-engine"
 import { useVisualizationState } from "@/core/visualization/hooks/use-visualization-state";
 import { useExecutionView } from "@/core/synchronization/hooks/use-execution-view";
 import type { SupportedLanguage } from "@/core/synchronization/types";
-import type { PlaybackSpeed as TimelinePlaybackSpeed } from "@/core/engine/types";
-import type { PlaybackSpeed as ExecutionPlaybackSpeed } from "@/core/execution/types";
-import { Breadcrumb } from "@/components/ui/breadcrumb";
-import { TimelineControls } from "@/components/ui/timeline-controls";
-import { CodeViewer } from "@/components/code/code-viewer";
-import { VariablesPanel } from "@/components/execution/variables-panel";
-import { ExplanationPanel } from "@/components/execution/explanation-panel";
-import { TopicBar } from "@/components/visualizer/topic-bar";
+import { VisuAlgoShell, type VisuAlgoAction } from "@/components/visualizer/visualgo-shell";
 import { TreeCanvas } from "./tree-canvas";
 import { TreeTraversalOutput } from "./tree-traversal-output";
-import { TreeOperationBar } from "./tree-operation-bar";
-import { TreeComplexityCard } from "./tree-complexity-card";
-import { ArrowLeft, PlaySquare, Code, Layers } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export interface TreeVisualizerShellProps {
   initialMode?: TreeMode;
@@ -49,8 +35,6 @@ export function TreeVisualizerShell({
   initialTreeState,
   className,
 }: TreeVisualizerShellProps) {
-  const router = useRouter();
-
   // 1. Domain Configuration States
   const [mode, setMode] = React.useState<TreeMode>(initialMode);
   const [treeState, setTreeState] = React.useState<TreeState<number>>(() => {
@@ -59,13 +43,17 @@ export function TreeVisualizerShell({
   });
   const [currentOperation, setCurrentOperation] = React.useState<TreeOperationType>("search");
   const [activeLanguage, setActiveLanguage] = React.useState<SupportedLanguage>("python");
-  const [mobileTab, setMobileTab] = React.useState<"visualizer" | "code">("visualizer");
 
   // Operation parameters for deterministic trace generation
   const [currentParams, setCurrentParams] = React.useState<Record<string, unknown>>({
     target: 60,
     value: 45,
   });
+
+  // Inputs
+  const [searchTarget, setSearchTarget] = React.useState("60");
+  const [insertValue, setInsertValue] = React.useState("45");
+  const [deleteValue, setDeleteValue] = React.useState("20");
 
   // 2. Deterministic Trace Generation based on TreeState & Operation
   const trace = React.useMemo(() => {
@@ -94,7 +82,6 @@ export function TreeVisualizerShell({
     visualizationState,
   });
 
-  // Handlers
   const handleModeChange = (newMode: TreeMode) => {
     setMode(newMode);
     if (newMode === "bst") {
@@ -106,186 +93,244 @@ export function TreeVisualizerShell({
       setCurrentOperation("search");
       setCurrentParams({ target: 15 });
     }
+    engine.reset();
   };
 
-  const handleOperationChange = (op: TreeOperationType, params: Record<string, unknown>) => {
+  const executeOp = (op: TreeOperationType, params: Record<string, unknown> = {}) => {
     setCurrentOperation(op);
     setCurrentParams(params);
+    engine.reset();
+    setTimeout(() => engine.play(), 50);
   };
 
-  const handleRandomTree = () => {
-    if (mode === "bst") {
-      // Deterministic random distinct values for BST
-      const pool = [15, 25, 35, 45, 55, 65, 75, 85, 95];
-      const shuffled = [...pool].sort(() => Math.random() - 0.5).slice(0, 6);
-      const newBST = buildBSTFromValues(shuffled);
-      setTreeState(newBST);
-      setCurrentOperation("search");
-      setCurrentParams({ target: shuffled[0] });
-    } else {
-      setTreeState(createSampleBinaryTreeState());
-    }
-  };
-
-  const handleResetSample = () => {
-    if (mode === "bst") {
-      setTreeState(createSampleBSTState());
-      setCurrentOperation("search");
-      setCurrentParams({ target: 60 });
-    } else {
-      setTreeState(createSampleBinaryTreeState());
-      setCurrentOperation("search");
-      setCurrentParams({ target: 15 });
-    }
-  };
-
-  const handleClear = () => {
-    setTreeState(createEmptyTreeState());
-    setCurrentOperation("clear");
-    setCurrentParams({});
-  };
-
-  // State snapshot at current playback step
   const activeStepState = engine.currentStep?.state || treeState;
   const activeHighlights = engine.currentStep?.highlightedElements || [];
 
-  return (
-    <div className={cn("min-h-screen bg-background text-foreground flex flex-col", className)}>
-      {/* Compact Horizontal Topic Bar */}
-      <TopicBar currentSlug={mode === "bst" ? "bst" : "binary-tree"} />
-
-      {/* Mobile Tab Switcher */}
-      <div className="lg:hidden border-b border-border bg-card/40 px-4 py-2">
-        <Tabs
-          value={mobileTab}
-          onValueChange={(val) => setMobileTab(val as "visualizer" | "code")}
-        >
-          <TabsList className="grid grid-cols-2 w-full">
-            <TabsTrigger value="visualizer" className="text-xs gap-1.5">
-              <PlaySquare className="w-3.5 h-3.5" />
-              Visualization
-            </TabsTrigger>
-            <TabsTrigger value="code" className="text-xs gap-1.5">
-              <Code className="w-3.5 h-3.5" />
-              Code & Vars
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
-      {/* 2. Main Visualizer Grid */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Center Canvas / Controls */}
-        <section
-          className={cn(
-            "lg:col-span-7 xl:col-span-8 space-y-4",
-            mobileTab !== "visualizer" && "hidden lg:block"
-          )}
-        >
-          {/* Tree Mode Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-card/60 border border-border/50 rounded-xl px-4 py-2.5">
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm font-bold tracking-tight text-foreground">
-                {mode === "bst" ? "Binary Search Tree (BST)" : "General Binary Tree"} Visualizer
-              </h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20">
-                {mode === "bst" ? "Ordered" : "Hierarchical"}
-              </span>
+  const actions: VisuAlgoAction[] = [
+    {
+      id: "search",
+      label: "Search",
+      popoverContent: (
+        <div className="space-y-3">
+          <div className="text-xs font-semibold text-foreground">Search Value (v)</div>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={searchTarget}
+              onChange={(e) => setSearchTarget(e.target.value)}
+              className="w-20 px-2 py-1 text-xs rounded bg-muted/60 border border-border text-foreground font-mono"
+            />
+            <button
+              onClick={() => {
+                executeOp("search", { target: parseInt(searchTarget, 10) || 60 });
+              }}
+              className="px-3 py-1 text-xs font-bold bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+            >
+              Go
+            </button>
+          </div>
+          <div className="pt-2 border-t border-border/50">
+            <div className="text-[11px] text-muted-foreground mb-1">Presets:</div>
+            <div className="flex flex-wrap gap-1">
+              {[20, 40, 60, 80].map((val) => (
+                <button
+                  key={val}
+                  onClick={() => {
+                    setSearchTarget(val.toString());
+                    executeOp("search", { target: val });
+                  }}
+                  className="px-2 py-0.5 text-[11px] rounded bg-muted hover:bg-primary/20 hover:text-primary transition-colors font-mono"
+                >
+                  v={val}
+                </button>
+              ))}
             </div>
           </div>
+        </div>
+      ),
+    },
+    {
+      id: "insert",
+      label: "Insert",
+      popoverContent: (
+        <div className="space-y-3">
+          <div className="text-xs font-semibold text-foreground">Insert Value (v)</div>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={insertValue}
+              onChange={(e) => setInsertValue(e.target.value)}
+              className="w-20 px-2 py-1 text-xs rounded bg-muted/60 border border-border text-foreground font-mono"
+            />
+            <button
+              onClick={() => {
+                executeOp("insert", { value: parseInt(insertValue, 10) || 45 });
+              }}
+              className="px-3 py-1 text-xs font-bold bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+            >
+              Go
+            </button>
+          </div>
+        </div>
+      ),
+    },
+    ...(mode === "bst"
+      ? [
+          {
+            id: "delete",
+            label: "Delete",
+            popoverContent: (
+              <div className="space-y-3">
+                <div className="text-xs font-semibold text-foreground">Delete Value (v)</div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={deleteValue}
+                    onChange={(e) => setDeleteValue(e.target.value)}
+                    className="w-20 px-2 py-1 text-xs rounded bg-muted/60 border border-border text-foreground font-mono"
+                  />
+                  <button
+                    onClick={() => {
+                      executeOp("delete", { target: parseInt(deleteValue, 10) || 20 });
+                    }}
+                    className="px-3 py-1 text-xs font-bold bg-rose-600 text-white rounded hover:bg-rose-700 transition-colors"
+                  >
+                    Go
+                  </button>
+                </div>
+              </div>
+            ),
+          },
+        ]
+      : []),
+    {
+      id: "traversals",
+      label: "Traverse",
+      popoverContent: (
+        <div className="space-y-2">
+          <div className="text-xs font-semibold text-foreground">Traversal Order</div>
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              onClick={() => executeOp("inorder")}
+              className="px-2.5 py-1 text-xs font-medium rounded bg-muted hover:bg-primary/20 hover:text-primary transition-colors text-left"
+            >
+              Inorder
+            </button>
+            <button
+              onClick={() => executeOp("preorder")}
+              className="px-2.5 py-1 text-xs font-medium rounded bg-muted hover:bg-primary/20 hover:text-primary transition-colors text-left"
+            >
+              Preorder
+            </button>
+            <button
+              onClick={() => executeOp("postorder")}
+              className="px-2.5 py-1 text-xs font-medium rounded bg-muted hover:bg-primary/20 hover:text-primary transition-colors text-left"
+            >
+              Postorder
+            </button>
+            <button
+              onClick={() => executeOp("level-order")}
+              className="px-2.5 py-1 text-xs font-medium rounded bg-muted hover:bg-primary/20 hover:text-primary transition-colors text-left"
+            >
+              Level Order
+            </button>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "random",
+      label: "Randomize",
+      onClick: () => {
+        if (mode === "bst") {
+          const pool = [15, 25, 35, 45, 55, 65, 75, 85, 95];
+          const shuffled = [...pool].sort(() => Math.random() - 0.5).slice(0, 6);
+          const newBST = buildBSTFromValues(shuffled);
+          setTreeState(newBST);
+          executeOp("search", { target: shuffled[0] });
+        } else {
+          setTreeState(createSampleBinaryTreeState());
+          executeOp("search", { target: 15 });
+        }
+      },
+    },
+    {
+      id: "reset",
+      label: "Reset Sample",
+      onClick: () => {
+        if (mode === "bst") {
+          setTreeState(createSampleBSTState());
+          executeOp("search", { target: 60 });
+        } else {
+          setTreeState(createSampleBinaryTreeState());
+          executeOp("search", { target: 15 });
+        }
+      },
+    },
+  ];
 
-          {/* Operations & Interactive Toolbar */}
-          <TreeOperationBar
-            mode={mode}
-            onModeChange={handleModeChange}
-            currentOperation={currentOperation}
-            onOperationChange={handleOperationChange}
-            treeState={treeState}
-            onRandomTree={handleRandomTree}
-            onResetSample={handleResetSample}
-            onClear={handleClear}
-          />
+  return (
+    <VisuAlgoShell
+      title={mode === "bst" ? "Binary Search Tree" : "Binary Tree Visualizer"}
+      category="Data Structures"
+      subVariants={[
+        { id: "bst", label: "Binary Search Tree (BST)", active: mode === "bst" },
+        { id: "binary-tree", label: "General Binary Tree", active: mode === "binary-tree" },
+      ]}
+      activeSubVariant={mode}
+      onSelectSubVariant={(id) => handleModeChange(id as TreeMode)}
+      actions={actions}
+      statusBadge={
+        engine.isPlaying
+          ? "Running"
+          : currentOperation.toUpperCase()
+      }
+      statusExplanation={
+        executionView.explanation ||
+        "Select Search, Insert, or Traverse from the bottom-left dock."
+      }
+      complexityBadge={
+        mode === "bst"
+          ? currentOperation === "search" || currentOperation === "insert" || currentOperation === "delete"
+            ? "Avg: O(log n) / Worst: O(n)"
+            : "O(n)"
+          : "O(n)"
+      }
+      code={executionView.sourceCode}
+      activeCodeLines={executionView.activeCodeLines}
+      currentStep={engine.currentStepIndex}
+      totalSteps={engine.totalSteps}
+      isPlaying={engine.isPlaying}
+      speed={engine.speed}
+      onPlay={engine.play}
+      onPause={engine.pause}
+      onStepForward={engine.next}
+      onStepBackward={engine.previous}
+      onGoToStart={engine.jumpToStart}
+      onGoToEnd={engine.jumpToEnd}
+      onSeek={engine.jumpTo}
+      onSpeedChange={(spd) => engine.setSpeed(spd)}
+      className={className}
+    >
+      {/* Full-stage Interactive Stage */}
+      <div className="w-full h-full flex flex-col items-center justify-center p-6 select-none relative overflow-hidden">
+        <TreeCanvas
+          treeState={activeStepState}
+          highlightedElements={activeHighlights}
+          className="w-full h-full min-h-[400px]"
+        />
 
-          {/* Graphical Tree Canvas */}
-          <TreeCanvas
-            treeState={activeStepState}
-            highlightedElements={activeHighlights}
-            currentOperation={currentOperation}
-          />
-
-          {/* Progressive Traversal Output Banner */}
-          <TreeTraversalOutput
-            treeState={activeStepState}
-            currentOperation={currentOperation}
-          />
-
-          {/* Step Explanation Callout */}
-          <ExplanationPanel
-            explanation={executionView.explanation}
-            operation={executionView.operation}
-            codeLine={executionView.primaryCodeLine}
-            stepIndex={executionView.stepIndex}
-            totalSteps={executionView.totalSteps}
-          />
-
-          {/* Timeline Playback Controls */}
-          <div className="rounded-xl border border-border/60 bg-card/60 p-4 shadow-sm">
-            <TimelineControls
-              isPlaying={engine.isPlaying}
-              currentStep={engine.currentStepIndex}
-              totalSteps={engine.totalSteps}
-              speed={
-                (engine.speed === 0.5 || engine.speed === 1 || engine.speed === 1.5 || engine.speed === 2
-                  ? engine.speed
-                  : 1) as TimelinePlaybackSpeed
-              }
-              onPlay={engine.play}
-              onPause={engine.pause}
-              onStepForward={engine.next}
-              onStepBackward={engine.previous}
-              onGoToStart={engine.jumpToStart}
-              onGoToEnd={engine.jumpToEnd}
-              onSeek={engine.jumpTo}
-              onSpeedChange={(s: TimelinePlaybackSpeed) => engine.setSpeed(s as ExecutionPlaybackSpeed)}
+        {/* Traversal Output Bar floating at top center */}
+        {activeStepState.traversalOutput && activeStepState.traversalOutput.length > 0 && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+            <TreeTraversalOutput
+              treeState={activeStepState}
+              currentOperation={currentOperation}
             />
           </div>
-        </section>
-
-        {/* Right Code Synchronization & Variable Inspector */}
-        <section
-          className={cn(
-            "lg:col-span-5 xl:col-span-4 space-y-4",
-            mobileTab !== "code" && "hidden lg:block"
-          )}
-        >
-          {/* Synchronized Code Viewer */}
-          <div className="rounded-xl border border-border/60 bg-card/60 overflow-hidden shadow-sm">
-            <CodeViewer
-              sourceCode={executionView.sourceCode}
-              activeLines={executionView.activeCodeLines}
-              primaryLine={executionView.primaryCodeLine}
-              language={activeLanguage}
-              onLanguageChange={setActiveLanguage}
-              availableLanguages={["python", "javascript", "typescript", "java", "cpp"]}
-              title="Synchronized Implementation"
-              className="flex-1 min-h-[220px]"
-            />
-          </div>
-
-          {/* Execution Variables Panel */}
-          <div className="rounded-xl border border-border/60 bg-card/60 overflow-hidden shadow-sm">
-            <VariablesPanel
-              variables={executionView.variables}
-              variableDiffs={executionView.variableDiffs}
-              title="Runtime Variables"
-            />
-          </div>
-
-          {/* Live Complexity & Invariants Card */}
-          <TreeComplexityCard treeState={activeStepState} mode={mode} />
-        </section>
-      </main>
-    </div>
+        )}
+      </div>
+    </VisuAlgoShell>
   );
 }
 

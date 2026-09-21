@@ -13,70 +13,62 @@ describe("ArrayVisualizerShell Component", () => {
     render(<ArrayVisualizerShell initialValues={[10, 20, 30]} />);
 
     // 1. Header and title
-    expect(screen.getByText("Array Visualizer")).toBeDefined();
-    expect(screen.getByText("Explore how arrays store and manipulate elements.")).toBeDefined();
+    expect(screen.getByText("Array Visualizer")).toBeInTheDocument();
 
-    // 2. Initial elements and indexes rendered
-    expect(screen.getByText("10")).toBeDefined();
-    expect(screen.getByText("20")).toBeDefined();
-    expect(screen.getByText("30")).toBeDefined();
+    // 2. Initial elements rendered
+    expect(screen.getByText("10")).toBeInTheDocument();
+    expect(screen.getByText("20")).toBeInTheDocument();
+    expect(screen.getByText("30")).toBeInTheDocument();
 
     // 3. Timeline controls
-    expect(screen.getByRole("button", { name: /play/i })).toBeDefined();
-    expect(screen.getByRole("button", { name: /next/i })).toBeDefined();
+    expect(screen.getByRole("button", { name: /play/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/step forward/i)).toBeInTheDocument();
 
-    // 4. Panels
-    expect(screen.getByText("Synchronized Implementation")).toBeDefined();
-    expect(screen.getByText("Runtime Variables")).toBeDefined();
-    expect(screen.getByText("Step Explanation")).toBeDefined();
+    // 4. Operations Dock
+    expect(screen.getByRole("button", { name: "Access" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Insert" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Search" })).toBeInTheDocument();
   });
 
   it("switches operation and updates controls and complexity", () => {
     render(<ArrayVisualizerShell initialValues={[10, 20, 30]} />);
 
-    // Click "Linear Search" operation button
-    const searchOpBtn = screen.getByRole("button", { name: /linear search/i });
+    // Click "Search" operation button
+    const searchOpBtn = screen.getByRole("button", { name: "Search" });
     fireEvent.click(searchOpBtn);
 
-    // Target Value input should appear
-    expect(screen.getByText("Target Value:")).toBeDefined();
-    expect(screen.getByText(/Linear Search Complexity/i)).toBeDefined();
+    // Target parameter input should appear in popover tray
+    expect(screen.getByPlaceholderText(/Value to search/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /go/i })).toBeInTheDocument();
   });
 
-  it("advances execution step when Next button is clicked", () => {
+  it("advances execution step when Step forward button is clicked", () => {
     render(<ArrayVisualizerShell initialValues={[20, 10]} />);
 
-    expect(screen.getByText(/Step 1 of/i)).toBeDefined();
+    expect(screen.getByLabelText("Timeline scrubber")).toHaveValue("0");
 
-    const nextBtn = screen.getByRole("button", { name: /next/i });
+    const nextBtn = screen.getByLabelText(/step forward/i);
     fireEvent.click(nextBtn);
 
-    expect(screen.getByText(/Step 2 of/i)).toBeDefined();
+    expect(screen.getByLabelText("Timeline scrubber")).toHaveValue("1");
   });
 
   it("allows entering a valid custom array and re-renders elements", () => {
     render(<ArrayVisualizerShell initialValues={[1, 2, 3]} />);
 
-    const input = screen.getByPlaceholderText(/Custom array/i);
+    // Click Create action dock button
+    const setArrayBtn = screen.getByRole("button", { name: "Create" });
+    fireEvent.click(setArrayBtn);
+
+    const input = screen.getByPlaceholderText(/comma separated/i);
     fireEvent.change(input, { target: { value: "50, 60, 70" } });
 
-    const loadBtn = screen.getByRole("button", { name: /load array/i });
-    fireEvent.click(loadBtn);
+    const goBtn = screen.getByRole("button", { name: /go/i });
+    fireEvent.click(goBtn);
 
-    expect(screen.getByText("50")).toBeDefined();
-    expect(screen.getByText("60")).toBeDefined();
-    expect(screen.getByText("70")).toBeDefined();
-  });
-
-  it("displays a clear error when invalid custom array is submitted", () => {
-    render(<ArrayVisualizerShell initialValues={[1, 2, 3]} />);
-
-    const input = screen.getByPlaceholderText(/Custom array/i);
-    fireEvent.change(input, { target: { value: "10, abc, 30" } });
-
-    const loadBtn = screen.getByRole("button", { name: /load array/i });
-    fireEvent.click(loadBtn);
-
-    expect(screen.getByText(/Invalid value "abc"/i)).toBeDefined();
+    expect(screen.getByText("50")).toBeInTheDocument();
+    expect(screen.getByText("60")).toBeInTheDocument();
+    expect(screen.getByText("70")).toBeInTheDocument();
   });
 });

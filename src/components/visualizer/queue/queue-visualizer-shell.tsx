@@ -1,8 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { QueueOperationType, QueueState, QueueVariant } from "@/core/queue/types";
 import {
@@ -17,20 +15,8 @@ import { useExecutionEngine } from "@/core/execution/hooks/use-execution-engine"
 import { useVisualizationState } from "@/core/visualization/hooks/use-visualization-state";
 import { useExecutionView } from "@/core/synchronization/hooks/use-execution-view";
 import type { SupportedLanguage } from "@/core/synchronization/types";
-import type { PlaybackSpeed as TimelinePlaybackSpeed } from "@/core/engine/types";
-import type { PlaybackSpeed as ExecutionPlaybackSpeed } from "@/core/execution/types";
-import { Breadcrumb } from "@/components/ui/breadcrumb";
-import { TimelineControls } from "@/components/ui/timeline-controls";
-import { CodeViewer } from "@/components/code/code-viewer";
-import { VariablesPanel } from "@/components/execution/variables-panel";
-import { ExplanationPanel } from "@/components/execution/explanation-panel";
-import { TopicBar } from "@/components/visualizer/topic-bar";
+import { VisuAlgoShell, type VisuAlgoAction } from "@/components/visualizer/visualgo-shell";
 import { QueueRenderer } from "./queue-renderer";
-import { QueueOperationBar } from "./queue-operation-bar";
-import { QueueComplexityCard } from "./queue-complexity-card";
-import { ArrowLeft, PlaySquare, Code, Layers } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export interface QueueVisualizerShellProps {
   initialValues?: readonly number[];
@@ -45,18 +31,17 @@ export function QueueVisualizerShell({
   initialCapacity = DEFAULT_QUEUE_CAPACITY,
   className,
 }: QueueVisualizerShellProps) {
-  const router = useRouter();
-
   // 1. Queue State, Variant & Operation Selection
   const [queueValues, setQueueValues] = React.useState<readonly number[]>(initialValues);
   const [variant, setVariant] = React.useState<QueueVariant>(initialVariant);
   const [capacity, setCapacity] = React.useState<number>(initialCapacity);
   const [currentOperation, setCurrentOperation] = React.useState<QueueOperationType>("enqueue");
   const [activeLanguage, setActiveLanguage] = React.useState<SupportedLanguage>("python");
-  const [mobileTab, setMobileTab] = React.useState<"visualizer" | "code">("visualizer");
-
-  // Track operation parameters for re-generating on queue change
   const [currentParams, setCurrentParams] = React.useState<Record<string, number>>({});
+
+  // Input states
+  const [enqueueVal, setEnqueueVal] = React.useState("55");
+  const [customInput, setCustomInput] = React.useState("");
 
   // 2. Base Queue State with stable IDs
   const queueState: QueueState = React.useMemo(() => {
@@ -90,15 +75,6 @@ export function QueueVisualizerShell({
     visualizationState,
   });
 
-  // Handlers
-  const handleApplyCustomQueue = (newValues: number[], newCapacity?: number) => {
-    setQueueValues(newValues);
-    if (newCapacity && newCapacity > 0) {
-      setCapacity(newCapacity);
-    }
-    engine.reset();
-  };
-
   const handleChangeVariant = (newVariant: QueueVariant) => {
     setVariant(newVariant);
     if (newVariant === "linear" && currentOperation === "isFull") {
@@ -108,154 +84,172 @@ export function QueueVisualizerShell({
     engine.reset();
   };
 
-  const handleSelectOperation = (op: QueueOperationType) => {
+  const executeOp = (op: QueueOperationType, params: Record<string, number> = {}) => {
     setCurrentOperation(op);
-    setCurrentParams({});
-    engine.reset();
-  };
-
-  const handleExecuteOperation = (params: Record<string, number>) => {
     setCurrentParams(params);
     engine.reset();
+    setTimeout(() => engine.play(), 50);
   };
 
-  return (
-    <div className={cn("flex flex-col min-h-screen bg-surface-100 dark:bg-surface-950", className)}>
-      {/* Compact Horizontal Topic Bar */}
-      <TopicBar currentSlug="queue" />
-
-      {/* Mobile Switcher Bar */}
-      <div className="lg:hidden border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-surface-900 p-2">
-        <Tabs value={mobileTab} onValueChange={(val) => setMobileTab(val as "visualizer" | "code")}>
-          <TabsList className="w-full grid grid-cols-2">
-            <TabsTrigger value="visualizer" className="gap-1">
-              <PlaySquare className="h-3 w-3" />
-              <span>Visualization</span>
-            </TabsTrigger>
-            <TabsTrigger value="code" className="gap-1">
-              <Code className="h-3 w-3" />
-              <span>Code & State</span>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
-      {/* Main Workspace Layout */}
-      <main className="flex-1 p-3 md:p-4 max-w-7xl w-full mx-auto flex flex-col gap-4">
-        {/* Visualizer Stage Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {/* Main Visualization Canvas & Operation Bar (7 cols desktop, 8 on xl) */}
-          <div
-            className={cn(
-              "lg:col-span-7 xl:col-span-8 flex flex-col gap-4",
-              mobileTab !== "visualizer" && "hidden lg:flex"
-            )}
-          >
-            {/* Visualizer Canvas Card */}
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-card dark:border-slate-800 dark:bg-surface-900 overflow-hidden flex flex-col">
-              {/* Canvas Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-surface-50 dark:bg-surface-950/60">
-                <div>
-                  <h1 className="text-sm font-bold text-slate-900 dark:text-white">
-                    {variant === "circular" ? "Circular Queue Visualizer" : "Queue Visualizer"}
-                  </h1>
-                  <p className="text-[11px] text-slate-500">
-                    {variant === "circular"
-                      ? "Observe modulo arithmetic and bounded buffer ring reuse."
-                      : "Master FIFO principles, enqueue at rear, and dequeue at front."}
-                  </p>
-                </div>
-                <span className="text-xs font-mono font-semibold text-brand-600 dark:text-brand-400">
-                  Step {engine.currentStepIndex + 1} of {engine.totalSteps}
-                </span>
-              </div>
-
-              {/* Main Queue Stage Render */}
-              <div className="flex-1 min-h-[280px] flex items-center justify-center bg-radial-pattern">
-                <QueueRenderer
-                  visualizationState={visualizationState}
-                  resolvedHighlights={resolvedHighlights}
-                  variant={variant}
-                  speed={engine.speed}
-                />
-              </div>
-
-              {/* Authoritative Timeline Controls */}
-              <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-surface-50 dark:bg-surface-950/40">
-                <TimelineControls
-                  isPlaying={engine.isPlaying}
-                  currentStep={engine.currentStepIndex}
-                  totalSteps={engine.totalSteps}
-                  speed={
-                    (engine.speed === 0.5 || engine.speed === 1 || engine.speed === 1.5 || engine.speed === 2
-                      ? engine.speed
-                      : 1) as TimelinePlaybackSpeed
-                  }
-                  onPlay={engine.play}
-                  onPause={engine.pause}
-                  onStepForward={engine.next}
-                  onStepBackward={engine.previous}
-                  onGoToStart={engine.jumpToStart}
-                  onGoToEnd={engine.jumpToEnd}
-                  onSeek={engine.jumpTo}
-                  onSpeedChange={(s: TimelinePlaybackSpeed) => engine.setSpeed(s as ExecutionPlaybackSpeed)}
-                />
-              </div>
-            </div>
-
-            {/* Custom Input & Operations Selector Bar */}
-            <QueueOperationBar
-              currentOperation={currentOperation}
-              variant={variant}
-              onSelectOperation={handleSelectOperation}
-              onSelectVariant={handleChangeVariant}
-              onApplyCustomQueue={handleApplyCustomQueue}
-              onExecuteOperation={handleExecuteOperation}
-              queueLength={queueValues.length}
-              capacity={capacity}
+  const actions: VisuAlgoAction[] = [
+    {
+      id: "enqueue",
+      label: "Enqueue",
+      popoverContent: (
+        <div className="space-y-3">
+          <div className="text-xs font-semibold text-foreground">Enqueue Value (v)</div>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={enqueueVal}
+              onChange={(e) => setEnqueueVal(e.target.value)}
+              className="w-20 px-2 py-1 text-xs rounded bg-muted/60 border border-border text-foreground font-mono"
             />
-
-            {/* Explanation Panel */}
-            <ExplanationPanel
-              explanation={executionView.explanation}
-              operation={executionView.operation}
-              codeLine={executionView.primaryCodeLine}
-              stepIndex={executionView.stepIndex}
-              totalSteps={executionView.totalSteps}
-            />
+            <button
+              onClick={() => {
+                executeOp("enqueue", { value: parseInt(enqueueVal, 10) || 55 });
+              }}
+              className="px-3 py-1 text-xs font-bold bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+            >
+              Go
+            </button>
           </div>
-
-          {/* Right Column: Code, Variables & Complexity (3 cols desktop) */}
-          <div
-            className={cn(
-              "lg:col-span-5 xl:col-span-4 flex flex-col gap-4",
-              mobileTab !== "code" && "hidden lg:flex"
-            )}
-          >
-            {/* Synchronized Code Viewer */}
-            <CodeViewer
-              sourceCode={executionView.sourceCode}
-              activeLines={executionView.activeCodeLines}
-              primaryLine={executionView.primaryCodeLine}
-              language={activeLanguage}
-              onLanguageChange={setActiveLanguage}
-              availableLanguages={["python", "typescript"]}
-              title="Synchronized Implementation"
-              className="flex-1 min-h-[220px]"
-            />
-
-            {/* Variables Inspector */}
-            <VariablesPanel
-              variables={executionView.variables}
-              variableDiffs={executionView.variableDiffs}
-              title="Runtime Variables"
-            />
-
-            {/* Asymptotic Complexity & Educational Information */}
-            <QueueComplexityCard operation={currentOperation} variant={variant} />
+          <div className="pt-2 border-t border-border/50">
+            <div className="text-[11px] text-muted-foreground mb-1">Presets:</div>
+            <div className="flex flex-wrap gap-1">
+              {[15, 30, 55, 99].map((val) => (
+                <button
+                  key={val}
+                  onClick={() => {
+                    setEnqueueVal(val.toString());
+                    executeOp("enqueue", { value: val });
+                  }}
+                  className="px-2 py-0.5 text-[11px] rounded bg-muted hover:bg-primary/20 hover:text-primary transition-colors font-mono"
+                >
+                  v={val}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </main>
-    </div>
+      ),
+    },
+    {
+      id: "dequeue",
+      label: "Dequeue",
+      onClick: () => executeOp("dequeue"),
+    },
+    {
+      id: "peek",
+      label: "Peek Front",
+      onClick: () => executeOp("front"),
+    },
+    {
+      id: "isEmpty",
+      label: "isEmpty",
+      onClick: () => executeOp("isEmpty"),
+    },
+    ...(variant === "circular"
+      ? [
+          {
+            id: "isFull",
+            label: "isFull",
+            onClick: () => executeOp("isFull"),
+          },
+        ]
+      : []),
+    {
+      id: "create",
+      label: "Create",
+      popoverContent: (
+        <div className="space-y-3">
+          <div className="text-xs font-semibold text-foreground">Queue Values (Front to Back)</div>
+          <input
+            type="text"
+            value={customInput}
+            onChange={(e) => setCustomInput(e.target.value)}
+            placeholder="e.g. 10, 20, 30"
+            className="w-full px-2 py-1 text-xs rounded bg-muted/60 border border-border text-foreground font-mono"
+          />
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <button
+              onClick={() => {
+                const len = Math.floor(Math.random() * 4) + 3;
+                const randomVals = Array.from({ length: len }, () => Math.floor(Math.random() * 90) + 10);
+                setQueueValues(randomVals);
+                engine.reset();
+              }}
+              className="px-2.5 py-1 text-xs font-medium rounded bg-muted hover:bg-primary/20 text-foreground transition-colors"
+            >
+              Random
+            </button>
+            <button
+              onClick={() => {
+                const parsed = customInput
+                  .split(",")
+                  .map((s) => parseInt(s.trim(), 10))
+                  .filter((n) => !isNaN(n));
+                if (parsed.length > 0) {
+                  setQueueValues(parsed);
+                  setCustomInput("");
+                  engine.reset();
+                }
+              }}
+              className="px-3 py-1 text-xs font-bold bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+            >
+              Go
+            </button>
+          </div>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <VisuAlgoShell
+      title="Queue Visualizer"
+      category="Data Structures"
+      subVariants={[
+        { id: "linear", label: "Linear Queue", active: variant === "linear" },
+        { id: "circular", label: "Circular Queue", active: variant === "circular" },
+      ]}
+      activeSubVariant={variant}
+      onSelectSubVariant={(id) => handleChangeVariant(id as QueueVariant)}
+      actions={actions}
+      statusBadge={
+        engine.isPlaying
+          ? "Running"
+          : currentOperation.toUpperCase()
+      }
+      statusExplanation={
+        executionView.explanation ||
+        "Select Enqueue, Dequeue, or Peek from the bottom-left dock."
+      }
+      complexityBadge="O(1)"
+      code={executionView.sourceCode}
+      activeCodeLines={executionView.activeCodeLines}
+      currentStep={engine.currentStepIndex}
+      totalSteps={engine.totalSteps}
+      isPlaying={engine.isPlaying}
+      speed={engine.speed}
+      onPlay={engine.play}
+      onPause={engine.pause}
+      onStepForward={engine.next}
+      onStepBackward={engine.previous}
+      onGoToStart={engine.jumpToStart}
+      onGoToEnd={engine.jumpToEnd}
+      onSeek={engine.jumpTo}
+      onSpeedChange={(spd) => engine.setSpeed(spd)}
+      className={className}
+    >
+      {/* Full-stage Interactive Stage */}
+      <div className="w-full h-full flex flex-col items-center justify-center p-6 select-none overflow-x-auto">
+        <QueueRenderer
+          visualizationState={visualizationState}
+          resolvedHighlights={resolvedHighlights}
+          speed={engine.speed}
+        />
+      </div>
+    </VisuAlgoShell>
   );
 }

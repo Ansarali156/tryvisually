@@ -1,8 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type {
   CollisionStrategy,
@@ -21,20 +19,8 @@ import { useExecutionEngine } from "@/core/execution/hooks/use-execution-engine"
 import { useVisualizationState } from "@/core/visualization/hooks/use-visualization-state";
 import { useExecutionView } from "@/core/synchronization/hooks/use-execution-view";
 import type { SupportedLanguage } from "@/core/synchronization/types";
-import type { PlaybackSpeed as TimelinePlaybackSpeed } from "@/core/engine/types";
-import type { PlaybackSpeed as ExecutionPlaybackSpeed } from "@/core/execution/types";
-import { Breadcrumb } from "@/components/ui/breadcrumb";
-import { TimelineControls } from "@/components/ui/timeline-controls";
-import { CodeViewer } from "@/components/code/code-viewer";
-import { VariablesPanel } from "@/components/execution/variables-panel";
-import { ExplanationPanel } from "@/components/execution/explanation-panel";
-import { TopicBar } from "@/components/visualizer/topic-bar";
+import { VisuAlgoShell, type VisuAlgoAction } from "@/components/visualizer/visualgo-shell";
 import { HashTableRenderer } from "./hash-table-renderer";
-import { HashTableOperationBar } from "./hash-table-operation-bar";
-import { HashTableComplexityCard } from "./hash-table-complexity-card";
-import { ArrowLeft, PlaySquare, Code, Layers } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export interface HashTableVisualizerShellProps {
   initialPairs?: readonly { key: string; value: string }[];
@@ -49,21 +35,24 @@ export function HashTableVisualizerShell({
   initialCapacity = DEFAULT_HASH_TABLE_CAPACITY,
   className,
 }: HashTableVisualizerShellProps) {
-  const router = useRouter();
-
   // 1. Domain Configuration States
   const [pairs, setPairs] = React.useState<readonly { key: string; value: string }[]>(initialPairs);
   const [strategy, setStrategy] = React.useState<CollisionStrategy>(initialStrategy);
   const [capacity, setCapacity] = React.useState<number>(initialCapacity);
   const [currentOperation, setCurrentOperation] = React.useState<HashTableOperationType>("insert");
   const [activeLanguage, setActiveLanguage] = React.useState<SupportedLanguage>("python");
-  const [mobileTab, setMobileTab] = React.useState<"visualizer" | "code">("visualizer");
 
   // Operation parameters for deterministic trace generation
   const [currentParams, setCurrentParams] = React.useState<Record<string, string | number>>({
     key: "Frank",
     value: "50",
   });
+
+  // Input states
+  const [insertKey, setInsertKey] = React.useState("Frank");
+  const [insertVal, setInsertVal] = React.useState("50");
+  const [searchKey, setSearchKey] = React.useState("Alice");
+  const [deleteKey, setDeleteKey] = React.useState("Bob");
 
   // 2. Base Hash Table State
   const hashTableState: HashTableState = React.useMemo(() => {
@@ -97,174 +86,204 @@ export function HashTableVisualizerShell({
     visualizationState,
   });
 
-  // Handlers
-  const handleSelectStrategy = (newStrategy: CollisionStrategy) => {
-    setStrategy(newStrategy);
-    engine.reset();
-  };
-
-  const handleSelectOperation = (op: HashTableOperationType) => {
+  const executeOp = (op: HashTableOperationType, params: Record<string, string | number>) => {
     setCurrentOperation(op);
-    engine.reset();
-  };
-
-  const handleExecuteOperation = (params: Record<string, string | number>) => {
     setCurrentParams(params);
     engine.reset();
+    setTimeout(() => engine.play(), 50);
   };
 
-  const handleResetSample = () => {
-    setPairs(DEFAULT_HASH_ENTRIES);
-    setCurrentParams({ key: "Frank", value: "50" });
-    engine.reset();
-  };
-
-  const handleInsertRandom = (key: string, value: string) => {
-    setCurrentOperation("insert");
-    setCurrentParams({ key, value });
-    engine.reset();
-  };
-
-  return (
-    <div className={cn("flex flex-col min-h-screen bg-surface-100 dark:bg-surface-950", className)}>
-      {/* Compact Horizontal Topic Bar */}
-      <TopicBar currentSlug="hash-table" />
-
-      {/* Mobile Switcher Bar */}
-      <div className="lg:hidden border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-surface-900 p-2">
-        <Tabs value={mobileTab} onValueChange={(val) => setMobileTab(val as "visualizer" | "code")}>
-          <TabsList className="w-full grid grid-cols-2">
-            <TabsTrigger value="visualizer" className="gap-1">
-              <PlaySquare className="h-3 w-3" />
-              <span>Visualization</span>
-            </TabsTrigger>
-            <TabsTrigger value="code" className="gap-1">
-              <Code className="h-3 w-3" />
-              <span>Code & State</span>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
-      {/* Main Workspace Layout */}
-      <main className="flex-1 p-3 md:p-4 max-w-7xl w-full mx-auto flex flex-col gap-4">
-        {/* Visualizer Stage Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {/* Main Visualization Canvas & Operation Bar (7 cols desktop, 8 on xl) */}
-          <div
-            className={cn(
-              "lg:col-span-7 xl:col-span-8 flex flex-col gap-4",
-              mobileTab !== "visualizer" && "hidden lg:flex"
-            )}
-          >
-            {/* Visualizer Canvas Card */}
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-card dark:border-slate-800 dark:bg-surface-900 overflow-hidden flex flex-col">
-              {/* Canvas Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-surface-50 dark:bg-surface-950/60">
-                <div>
-                  <h1 className="text-sm font-bold text-slate-900 dark:text-white">
-                    Hash Table Visualizer
-                  </h1>
-                  <p className="text-[11px] text-slate-500">
-                    Observe key hashing, bucket indexing, collisions, and open-addressing tombstones.
-                  </p>
-                </div>
-                <span className="text-xs font-mono font-semibold text-brand-600 dark:text-brand-400">
-                  Step {engine.currentStepIndex + 1} of {engine.totalSteps}
-                </span>
-              </div>
-
-              {/* Main Hash Table Canvas Render */}
-              <div className="flex-1 min-h-[300px] flex items-center justify-center bg-radial-pattern">
-                <HashTableRenderer
-                  visualizationState={visualizationState}
-                  resolvedHighlights={resolvedHighlights}
-                  speed={engine.speed}
-                />
-              </div>
-
-              {/* Authoritative Timeline Controls */}
-              <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-surface-50 dark:bg-surface-950/40">
-                <TimelineControls
-                  isPlaying={engine.isPlaying}
-                  currentStep={engine.currentStepIndex}
-                  totalSteps={engine.totalSteps}
-                  speed={
-                    (engine.speed === 0.5 || engine.speed === 1 || engine.speed === 1.5 || engine.speed === 2
-                      ? engine.speed
-                      : 1) as TimelinePlaybackSpeed
-                  }
-                  onPlay={engine.play}
-                  onPause={engine.pause}
-                  onStepForward={engine.next}
-                  onStepBackward={engine.previous}
-                  onGoToStart={engine.jumpToStart}
-                  onGoToEnd={engine.jumpToEnd}
-                  onSeek={engine.jumpTo}
-                  onSpeedChange={(s: TimelinePlaybackSpeed) => engine.setSpeed(s as ExecutionPlaybackSpeed)}
-                />
-              </div>
-            </div>
-
-            {/* Custom Input & Operations Selector Bar */}
-            <HashTableOperationBar
-              strategy={strategy}
-              onSelectStrategy={handleSelectStrategy}
-              currentOperation={currentOperation}
-              onSelectOperation={handleSelectOperation}
-              onExecuteOperation={handleExecuteOperation}
-              onResetSample={handleResetSample}
-              onInsertRandom={handleInsertRandom}
-              size={hashTableState.size}
-              capacity={capacity}
-              loadFactor={hashTableState.loadFactor}
+  const actions: VisuAlgoAction[] = [
+    {
+      id: "insert",
+      label: "Insert",
+      popoverContent: (
+        <div className="space-y-3">
+          <div className="text-xs font-semibold text-foreground">Insert Key-Value</div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="Key"
+              value={insertKey}
+              onChange={(e) => setInsertKey(e.target.value)}
+              className="w-20 px-2 py-1 text-xs rounded bg-muted/60 border border-border text-foreground font-mono"
             />
-
-            {/* Explanation Panel */}
-            <ExplanationPanel
-              explanation={executionView.explanation}
-              operation={executionView.operation}
-              codeLine={executionView.primaryCodeLine}
-              stepIndex={executionView.stepIndex}
-              totalSteps={executionView.totalSteps}
+            <input
+              type="text"
+              placeholder="Val"
+              value={insertVal}
+              onChange={(e) => setInsertVal(e.target.value)}
+              className="w-16 px-2 py-1 text-xs rounded bg-muted/60 border border-border text-foreground font-mono"
             />
+            <button
+              onClick={() => {
+                if (insertKey.trim()) {
+                  executeOp("insert", { key: insertKey.trim(), value: insertVal || "1" });
+                }
+              }}
+              className="px-3 py-1 text-xs font-bold bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+            >
+              Go
+            </button>
           </div>
-
-          {/* Right Column: Code, Variables & Complexity (3 cols desktop) */}
-          <div
-            className={cn(
-              "lg:col-span-5 xl:col-span-4 flex flex-col gap-4",
-              mobileTab !== "code" && "hidden lg:flex"
-            )}
-          >
-            {/* Synchronized Code Viewer */}
-            <CodeViewer
-              sourceCode={executionView.sourceCode}
-              activeLines={executionView.activeCodeLines}
-              primaryLine={executionView.primaryCodeLine}
-              language={activeLanguage}
-              onLanguageChange={setActiveLanguage}
-              availableLanguages={["python", "javascript", "typescript", "java", "cpp"]}
-              title="Synchronized Implementation"
-              className="flex-1 min-h-[220px]"
-            />
-
-            {/* Variables Inspector */}
-            <VariablesPanel
-              variables={executionView.variables}
-              variableDiffs={executionView.variableDiffs}
-              title="Runtime Variables"
-            />
-
-            {/* Asymptotic Complexity & Educational Information */}
-            <HashTableComplexityCard
-              operation={currentOperation}
-              strategy={strategy}
-              loadFactor={hashTableState.loadFactor}
-            />
+          <div className="pt-2 border-t border-border/50">
+            <div className="text-[11px] text-muted-foreground mb-1">Presets:</div>
+            <div className="flex flex-wrap gap-1">
+              {[
+                { k: "Grace", v: "70" },
+                { k: "Henry", v: "85" },
+                { k: "Ivy", v: "92" },
+              ].map((p) => (
+                <button
+                  key={p.k}
+                  onClick={() => {
+                    setInsertKey(p.k);
+                    setInsertVal(p.v);
+                    executeOp("insert", { key: p.k, value: p.v });
+                  }}
+                  className="px-2 py-0.5 text-[11px] rounded bg-muted hover:bg-primary/20 hover:text-primary transition-colors font-mono"
+                >
+                  {p.k}:{p.v}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </main>
-    </div>
+      ),
+    },
+    {
+      id: "search",
+      label: "Search",
+      popoverContent: (
+        <div className="space-y-3">
+          <div className="text-xs font-semibold text-foreground">Search Key</div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={searchKey}
+              onChange={(e) => setSearchKey(e.target.value)}
+              placeholder="e.g. Alice"
+              className="w-24 px-2 py-1 text-xs rounded bg-muted/60 border border-border text-foreground font-mono"
+            />
+            <button
+              onClick={() => {
+                if (searchKey.trim()) {
+                  executeOp("search", { key: searchKey.trim() });
+                }
+              }}
+              className="px-3 py-1 text-xs font-bold bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+            >
+              Go
+            </button>
+          </div>
+          <div className="pt-2 border-t border-border/50">
+            <div className="text-[11px] text-muted-foreground mb-1">Existing Keys:</div>
+            <div className="flex flex-wrap gap-1">
+              {pairs.slice(0, 4).map((p) => (
+                <button
+                  key={p.key}
+                  onClick={() => {
+                    setSearchKey(p.key);
+                    executeOp("search", { key: p.key });
+                  }}
+                  className="px-2 py-0.5 text-[11px] rounded bg-muted hover:bg-primary/20 hover:text-primary transition-colors font-mono"
+                >
+                  {p.key}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "delete",
+      label: "Delete",
+      popoverContent: (
+        <div className="space-y-3">
+          <div className="text-xs font-semibold text-foreground">Delete Key</div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={deleteKey}
+              onChange={(e) => setDeleteKey(e.target.value)}
+              className="w-24 px-2 py-1 text-xs rounded bg-muted/60 border border-border text-foreground font-mono"
+            />
+            <button
+              onClick={() => {
+                if (deleteKey.trim()) {
+                  executeOp("delete", { key: deleteKey.trim() });
+                }
+              }}
+              className="px-3 py-1 text-xs font-bold bg-rose-600 text-white rounded hover:bg-rose-700 transition-colors"
+            >
+              Go
+            </button>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "reset",
+      label: "Reset Sample",
+      onClick: () => {
+        setPairs(DEFAULT_HASH_ENTRIES);
+        setCurrentParams({ key: "Frank", value: "50" });
+        engine.reset();
+      },
+    },
+  ];
+
+  return (
+    <VisuAlgoShell
+      title="Hash Table Visualizer"
+      category="Data Structures"
+      subVariants={[
+        { id: "chaining", label: "Separate Chaining", active: strategy === "chaining" },
+        { id: "linear-probing", label: "Linear Probing", active: strategy === "linear-probing" },
+      ]}
+      activeSubVariant={strategy}
+      onSelectSubVariant={(id) => {
+        setStrategy(id as CollisionStrategy);
+        engine.reset();
+      }}
+      actions={actions}
+      statusBadge={
+        engine.isPlaying
+          ? "Running"
+          : currentOperation.toUpperCase()
+      }
+      statusExplanation={
+        executionView.explanation ||
+        "Select Insert, Search, or Delete from the bottom-left dock."
+      }
+      complexityBadge={
+        strategy === "chaining" ? "Avg: O(1) / Worst: O(n)" : "Avg: O(1) / Cluster: O(n)"
+      }
+      code={executionView.sourceCode}
+      activeCodeLines={executionView.activeCodeLines}
+      currentStep={engine.currentStepIndex}
+      totalSteps={engine.totalSteps}
+      isPlaying={engine.isPlaying}
+      speed={engine.speed}
+      onPlay={engine.play}
+      onPause={engine.pause}
+      onStepForward={engine.next}
+      onStepBackward={engine.previous}
+      onGoToStart={engine.jumpToStart}
+      onGoToEnd={engine.jumpToEnd}
+      onSeek={engine.jumpTo}
+      onSpeedChange={(spd) => engine.setSpeed(spd)}
+      className={className}
+    >
+      {/* Full-stage Interactive Stage */}
+      <div className="w-full h-full flex flex-col items-center justify-center p-6 select-none overflow-x-auto">
+        <HashTableRenderer
+          visualizationState={visualizationState}
+          resolvedHighlights={resolvedHighlights}
+          speed={engine.speed}
+        />
+      </div>
+    </VisuAlgoShell>
   );
 }

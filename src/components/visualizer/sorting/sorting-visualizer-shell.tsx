@@ -13,15 +13,9 @@ import {
 import { SORTING_SNIPPETS } from "@/core/sorting/code-snippets";
 import { useExecutionEngine } from "@/core/execution/hooks/use-execution-engine";
 import type { SupportedLanguage } from "@/core/synchronization/types";
-import { TopicBar } from "@/components/visualizer/topic-bar";
-import { TimelineControls } from "@/components/ui/timeline-controls";
-import { CodeViewer } from "@/components/code/code-viewer";
-import { VariablesPanel } from "@/components/execution/variables-panel";
-import { ExplanationPanel } from "@/components/execution/explanation-panel";
-import { Button } from "@/components/ui/button";
+import { VisuAlgoShell, VisuAlgoAction } from "../visualgo-shell";
+import { Play, Shuffle, Edit3, ArrowUpDown } from "lucide-react";
 import type { PlaybackSpeed } from "@/core/engine/types";
-import { Input } from "@/components/ui/input";
-import { ArrowUpDown, Play, Shuffle } from "lucide-react";
 
 interface Props {
   initialAlgorithm?: SortingAlgorithmType;
@@ -71,16 +65,6 @@ export function SortingVisualizerShell({
 
   const [trace, setTrace] = React.useState(() => createTrace(algorithm, currentArray));
 
-  const handleRun = React.useCallback(() => {
-    setTrace(createTrace(algorithm, currentArray));
-  }, [algorithm, currentArray, createTrace]);
-
-  const handleShuffle = () => {
-    const shuffled = [...currentArray].sort(() => Math.random() - 0.5);
-    setArrayInput(shuffled.join(", "));
-    setTrace(createTrace(algorithm, shuffled));
-  };
-
   const engine = useExecutionEngine<SortingState>(trace, { initialSpeed: 1 });
   const currentStep = engine.currentStep;
   const runtimeState = currentStep?.state;
@@ -98,182 +82,166 @@ export function SortingVisualizerShell({
 
   const activeLine = currentStep?.codeLine ?? 1;
 
+  // Sub-variants for top bar
+  const subVariants = ALGORITHMS.map((algo) => ({
+    id: algo.id,
+    label: `${algo.name} (${algo.complexity})`,
+    active: algorithm === algo.id,
+    onSelect: () => {
+      setAlgorithm(algo.id);
+      const newTrace = createTrace(algo.id, currentArray);
+      setTrace(newTrace);
+    },
+  }));
+
+  // Actions for VisuAlgo bottom-left dock
+  const actions: VisuAlgoAction[] = [
+    {
+      id: "sort",
+      label: "Sort",
+      icon: Play,
+      description: "Start or resume sorting execution",
+      onExecute: () => {
+        engine.play();
+      },
+    },
+    {
+      id: "create",
+      label: "Create",
+      icon: Edit3,
+      description: "Define custom array or choose presets",
+      params: [
+        {
+          name: "input",
+          label: "Numbers (comma separated)",
+          type: "text",
+          defaultValue: arrayInput,
+          placeholder: "e.g. 48, 15, 82, 36",
+        },
+      ],
+      presets: [
+        { label: "Random 8", values: { input: [34, 12, 89, 55, 23, 76, 45, 91].join(", ") } },
+        { label: "Nearly Sorted", values: { input: [10, 20, 40, 30, 50, 60, 80, 70].join(", ") } },
+        { label: "Reversed", values: { input: [90, 80, 70, 60, 50, 40, 30, 20].join(", ") } },
+      ],
+      onExecute: (params) => {
+        const val = String(params.input ?? arrayInput);
+        setArrayInput(val);
+        const parsed = val
+          .split(",")
+          .map((s: string) => parseInt(s.trim(), 10))
+          .filter((n: number) => !isNaN(n));
+        const finalArr = parsed.length > 0 ? parsed : DEFAULT_ARRAY;
+        setTrace(createTrace(algorithm, finalArr));
+      },
+    },
+    {
+      id: "shuffle",
+      label: "Shuffle",
+      icon: Shuffle,
+      description: "Randomize array elements",
+      onExecute: () => {
+        const shuffled = [...currentArray].sort(() => Math.random() - 0.5);
+        setArrayInput(shuffled.join(", "));
+        setTrace(createTrace(algorithm, shuffled));
+      },
+    },
+  ];
+
+  const currentAlgoObj = ALGORITHMS.find((a) => a.id === algorithm) || ALGORITHMS[0];
+
   return (
-    <div className={cn("min-h-screen flex flex-col bg-background text-foreground", className)}>
-      <TopicBar />
+    <VisuAlgoShell
+      title="Sorting Visualizer"
+      category="Sorting Algorithms"
+      subVariants={subVariants}
+      currentAction={runtimeState?.phaseDescription || `${currentAlgoObj.name}`}
+      stepExplanation={currentStep?.explanation || `Ready to sort ${currentArray.length} elements using ${currentAlgoObj.name}.`}
+      whyExplanation={undefined}
+      timeComplexity={currentAlgoObj.complexity}
+      spaceComplexity={algorithm === "merge-sort" ? "O(n)" : "O(1)"}
+      currentStep={engine.currentStepIndex}
+      totalSteps={engine.totalSteps}
+      isPlaying={engine.isPlaying}
+      speed={engine.speed as PlaybackSpeed}
+      onPlay={engine.play}
+      onPause={engine.pause}
+      onStepForward={engine.next}
+      onStepBackward={engine.previous}
+      onGoToStart={engine.jumpToStart}
+      onGoToEnd={engine.jumpToEnd}
+      onSeek={(step) => engine.jumpTo(step)}
+      onSpeedChange={(spd) => engine.setSpeed(spd)}
+      actions={actions}
+      code={rawCode}
+      activeCodeLines={[activeLine]}
+      language={activeLanguage}
+      onLanguageChange={setActiveLanguage}
+      className={className}
+    >
+      {/* Full-Stage Dominant Sorting Canvas */}
+      <div className="w-full max-w-5xl h-full flex flex-col justify-center items-center gap-8 py-6 select-none">
+        {/* Bars Viewport */}
+        <div className="w-full flex items-end justify-center gap-3 sm:gap-4 md:gap-5 h-[340px] sm:h-[400px] px-4">
+          {runtimeState?.array.map((val, idx) => {
+            const isComparing = runtimeState.comparingIndices.includes(idx);
+            const isSwapped = runtimeState.swappedIndices.includes(idx);
+            const isSorted = runtimeState.sortedIndices.includes(idx);
+            const isPivot = runtimeState.pivotIndex === idx;
 
-      <main className="flex-1 flex flex-col p-4 md:p-6 max-w-[1700px] w-full mx-auto gap-4">
-        {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-2 border-b border-border">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-              <ArrowUpDown className="w-6 h-6 text-primary" />
-              Sorting Visualizer
-            </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Watch comparisons, swaps, partitions, and divide-and-conquer steps in real time.
-            </p>
-          </div>
+            // Height percentage
+            const heightPct = Math.max(14, Math.round((val / maxVal) * 92));
 
-          <div className="flex flex-wrap items-center gap-2">
-            {ALGORITHMS.map((algo) => (
-              <Button
-                key={algo.id}
-                variant={algorithm === algo.id ? "primary" : "outline"}
-                size="sm"
-                className="text-xs h-8"
-                onClick={() => {
-                  setAlgorithm(algo.id);
-                  setTrace(createTrace(algo.id, currentArray));
-                }}
-              >
-                {algo.name} ({algo.complexity})
-              </Button>
-            ))}
-          </div>
-        </div>
+            return (
+              <div key={idx} className="flex flex-col items-center gap-2 flex-1 max-w-[64px] h-full justify-end">
+                {/* Bar */}
+                <div
+                  style={{ height: `${heightPct}%` }}
+                  className={cn(
+                    "w-full rounded-t-xl transition-all duration-300 flex flex-col justify-between items-center py-2.5 text-xs font-mono font-bold shadow-md",
+                    isPivot
+                      ? "bg-purple-600 text-white ring-4 ring-purple-500/30"
+                      : isSwapped
+                      ? "bg-rose-500 text-white ring-4 ring-rose-500/40 scale-105"
+                      : isComparing
+                      ? "bg-amber-400 text-slate-950 ring-4 ring-amber-500/40 scale-105"
+                      : isSorted
+                      ? "bg-emerald-500 text-white shadow-emerald-500/20"
+                      : "bg-cyan-600 hover:bg-cyan-500 text-white dark:bg-cyan-700 dark:hover:bg-cyan-600"
+                  )}
+                >
+                  <span className="text-[11px] drop-shadow-xs font-bold">{val}</span>
+                </div>
 
-        {/* Controls Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-muted/40 p-3 rounded-lg border border-border">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-semibold text-muted-foreground">Array:</span>
-              <Input
-                type="text"
-                value={arrayInput}
-                onChange={(e) => setArrayInput(e.target.value)}
-                placeholder="Comma separated numbers"
-                className="w-56 h-8 text-xs bg-background"
-              />
-            </div>
-
-            <Button size="sm" variant="outline" onClick={handleShuffle} className="h-8 gap-1.5">
-              <Shuffle className="w-3.5 h-3.5" />
-              Shuffle
-            </Button>
-
-            <Button size="sm" onClick={handleRun} className="h-8 gap-1.5">
-              <Play className="w-3.5 h-3.5" />
-              Sort
-            </Button>
-          </div>
-
-          <div className="text-xs font-medium text-muted-foreground">
-            {runtimeState?.phaseDescription || "Ready to sort"}
-          </div>
-        </div>
-
-        {/* Visualizer Canvas & Code Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1">
-          {/* Canvas Area */}
-          <div className="lg:col-span-8 flex flex-col gap-3 min-h-[520px]">
-            <div className="flex-1 relative rounded-xl border border-border bg-card p-6 flex flex-col justify-end items-center min-h-[460px] overflow-x-auto">
-              {/* Vertical Bar Chart Representation */}
-              <div className="w-full flex items-end justify-center gap-2 md:gap-4 h-[320px] px-4">
-                {runtimeState?.array.map((val, idx) => {
-                  const isComparing = runtimeState.comparingIndices.includes(idx);
-                  const isSwapped = runtimeState.swappedIndices.includes(idx);
-                  const isSorted = runtimeState.sortedIndices.includes(idx);
-                  const isPivot = runtimeState.pivotIndex === idx;
-
-                  // Height percentage
-                  const heightPct = Math.max(12, Math.round((val / maxVal) * 90));
-
-                  return (
-                    <div key={idx} className="flex flex-col items-center gap-2 flex-1 max-w-[56px]">
-                      {/* Bar */}
-                      <div
-                        style={{ height: `${heightPct}%` }}
-                        className={cn(
-                          "w-full rounded-t-lg transition-all duration-200 flex flex-col justify-between items-center py-2 text-xs font-bold shadow-sm",
-                          isPivot
-                            ? "bg-purple-500 text-white ring-4 ring-purple-500/30"
-                            : isSwapped
-                            ? "bg-rose-500 text-white ring-4 ring-rose-500/30 scale-105"
-                            : isComparing
-                            ? "bg-amber-500 text-white ring-4 ring-amber-500/30 scale-105"
-                            : isSorted
-                            ? "bg-emerald-500 text-white"
-                            : "bg-primary/80 hover:bg-primary text-primary-foreground"
-                        )}
-                      >
-                        <span className="text-[11px] drop-shadow-sm">{val}</span>
-                      </div>
-
-                      {/* Index Tag */}
-                      <span className="text-[11px] font-mono text-muted-foreground">
-                        {idx}
-                      </span>
-                    </div>
-                  );
-                })}
+                {/* Index Tag */}
+                <span className="text-[11px] font-mono text-slate-400">
+                  [{idx}]
+                </span>
               </div>
+            );
+          })}
+        </div>
 
-              {/* Status Legend */}
-              <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs font-medium text-muted-foreground border-t border-border pt-3 w-full">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded bg-amber-500" />
-                  <span>Comparing</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded bg-rose-500" />
-                  <span>Swapping / Shifting</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded bg-purple-500" />
-                  <span>Pivot</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded bg-emerald-500" />
-                  <span>Sorted</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Timeline Controls */}
-            <TimelineControls
-              isPlaying={engine.isPlaying}
-              currentStep={engine.currentStepIndex}
-              totalSteps={engine.totalSteps}
-              speed={engine.speed as PlaybackSpeed}
-              onPlay={engine.play}
-              onPause={engine.pause}
-              onStepForward={engine.next}
-              onStepBackward={engine.previous}
-              onGoToStart={engine.jumpToStart}
-              onGoToEnd={engine.jumpToEnd}
-              onSeek={engine.jumpTo}
-              onSpeedChange={(spd: PlaybackSpeed) => engine.setSpeed(spd)}
-            />
+        {/* Legend */}
+        <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-mono text-slate-500 dark:text-slate-400 border-t border-slate-200/80 dark:border-slate-800/80 pt-3">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-amber-400" />
+            <span>Comparing</span>
           </div>
-
-          {/* Right Side: Code & Variables */}
-          <div className="lg:col-span-4 flex flex-col gap-3">
-            <div className="rounded-xl border border-border bg-card overflow-hidden flex flex-col min-h-[300px]">
-              <CodeViewer
-                rawCode={rawCode}
-                language={activeLanguage}
-                onLanguageChange={setActiveLanguage}
-                activeLines={[activeLine]}
-                primaryLine={activeLine}
-              />
-            </div>
-
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
-              <VariablesPanel variables={currentStep?.variables ?? {}} />
-            </div>
-
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
-              <ExplanationPanel
-                title="Sorting Step"
-                explanation={currentStep?.explanation ?? "Click Sort to start sorting."}
-                stepIndex={engine.currentStepIndex}
-                totalSteps={engine.totalSteps}
-              />
-            </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-rose-500" />
+            <span>Swapping</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-emerald-500" />
+            <span>Sorted</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-purple-600" />
+            <span>Pivot</span>
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </VisuAlgoShell>
   );
 }

@@ -4,7 +4,6 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import {
   HeapVisualizerShell,
   MinHeapVisualizerShell,
-  MaxHeapVisualizerShell,
 } from "../heap-visualizer-shell";
 import { PriorityQueueVisualizerShell } from "../priority-queue-visualizer-shell";
 
@@ -22,38 +21,31 @@ describe("Heap & Priority Queue Visualizer Components", () => {
     render(<MinHeapVisualizerShell />);
 
     // Check Header & Badges
-    expect(screen.getByText(/Binary Heap Visualizer/i)).toBeInTheDocument();
-    expect(screen.getByText(/Complete Tree/i)).toBeInTheDocument();
+    expect(screen.getByText("Binary Heap Visualizer")).toBeInTheDocument();
 
     // Check Operations
-    expect(screen.getByRole("button", { name: /Extract Root/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Peek Root/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Heapify/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Build Heap/i })).toBeInTheDocument();
-
-    // Check Synchronized Array View
-    expect(screen.getByText(/Synchronized Array Representation/i)).toBeInTheDocument();
-
-    // Check Complexity Card
-    expect(screen.getByText(/Time & Space Complexity/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Insert" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Extract-Min" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Peek Root" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Build Heap" })).toBeInTheDocument();
   });
 
   it("should switch between Min Heap and Max Heap modes", () => {
     render(<HeapVisualizerShell initialHeapType="min" />);
 
-    const maxHeapBtn = screen.getByRole("button", { name: "Max Heap" });
+    const maxHeapBtn = screen.getByRole("button", { name: "Max-Heap" });
     fireEvent.click(maxHeapBtn);
 
-    expect(screen.getAllByText(/MAX HEAP/i).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Extract-Max" })).toBeInTheDocument();
   });
 
   it("should render Priority Queue Visualizer Shell with operations", () => {
     render(<PriorityQueueVisualizerShell />);
 
-    expect(screen.getByText(/Priority Queue Visualizer/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Enqueue Task/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Dequeue Highest Priority/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Peek Top/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Check Size/i })).toBeInTheDocument();
+    expect(screen.getByText("Priority Queue Visualizer")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enqueue" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Dequeue" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Peek" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reset Sample" })).toBeInTheDocument();
   });
 });

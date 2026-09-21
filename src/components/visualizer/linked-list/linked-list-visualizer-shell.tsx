@@ -1,8 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type {
   LinkedListOperationType,
@@ -17,20 +15,8 @@ import { useExecutionEngine } from "@/core/execution/hooks/use-execution-engine"
 import { useVisualizationState } from "@/core/visualization/hooks/use-visualization-state";
 import { useExecutionView } from "@/core/synchronization/hooks/use-execution-view";
 import type { SupportedLanguage } from "@/core/synchronization/types";
-import type { PlaybackSpeed as TimelinePlaybackSpeed } from "@/core/engine/types";
-import type { PlaybackSpeed as ExecutionPlaybackSpeed } from "@/core/execution/types";
-import { Breadcrumb } from "@/components/ui/breadcrumb";
-import { TimelineControls } from "@/components/ui/timeline-controls";
-import { CodeViewer } from "@/components/code/code-viewer";
-import { VariablesPanel } from "@/components/execution/variables-panel";
-import { ExplanationPanel } from "@/components/execution/explanation-panel";
-import { TopicBar } from "@/components/visualizer/topic-bar";
+import { VisuAlgoShell, type VisuAlgoAction } from "@/components/visualizer/visualgo-shell";
 import { LinkedListRenderer } from "./linked-list-renderer";
-import { LinkedListOperationBar } from "./linked-list-operation-bar";
-import { LinkedListComplexityCard } from "./linked-list-complexity-card";
-import { ArrowLeft, PlaySquare, Code, Layers } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export interface LinkedListVisualizerShellProps {
   initialValues?: readonly number[];
@@ -43,17 +29,21 @@ export function LinkedListVisualizerShell({
   initialVariant = "singly",
   className,
 }: LinkedListVisualizerShellProps) {
-  const router = useRouter();
-
   // 1. Variant, List State & Operation Selection
   const [variant, setVariant] = React.useState<LinkedListVariant>(initialVariant);
   const [listValues, setListValues] = React.useState<readonly number[]>(initialValues);
   const [currentOperation, setCurrentOperation] = React.useState<LinkedListOperationType>("traverse");
   const [activeLanguage, setActiveLanguage] = React.useState<SupportedLanguage>("python");
-  const [mobileTab, setMobileTab] = React.useState<"visualizer" | "code">("visualizer");
 
   // Track operation parameters for re-generating on state change
   const [currentParams, setCurrentParams] = React.useState<Record<string, number>>({});
+
+  // Input states for popovers
+  const [insertVal, setInsertVal] = React.useState("50");
+  const [insertIdx, setInsertIdx] = React.useState("1");
+  const [deleteIdx, setDeleteIdx] = React.useState("1");
+  const [searchVal, setSearchVal] = React.useState("20");
+  const [customInput, setCustomInput] = React.useState("");
 
   // 2. Base Linked List State with stable IDs
   const linkedListState: LinkedListState = React.useMemo(() => {
@@ -87,7 +77,6 @@ export function LinkedListVisualizerShell({
     visualizationState,
   });
 
-  // Handlers
   const handleSelectVariant = (newVariant: LinkedListVariant) => {
     setVariant(newVariant);
     if (newVariant === "circular" && currentOperation === "reverse") {
@@ -96,155 +85,259 @@ export function LinkedListVisualizerShell({
     engine.reset();
   };
 
-  const handleApplyCustomList = (newValues: number[]) => {
-    setListValues(newValues);
-    engine.reset();
-  };
-
-  const handleSelectOperation = (op: LinkedListOperationType) => {
+  const executeOp = (op: LinkedListOperationType, params: Record<string, number> = {}) => {
     setCurrentOperation(op);
-    setCurrentParams({});
-    engine.reset();
-  };
-
-  const handleExecuteOperation = (params: Record<string, number>) => {
     setCurrentParams(params);
     engine.reset();
+    setTimeout(() => engine.play(), 50);
   };
 
-  return (
-    <div className={cn("flex flex-col min-h-screen bg-surface-100 dark:bg-surface-950", className)}>
-      {/* Compact Horizontal Topic Bar */}
-      <TopicBar currentSlug="linked-lists" />
-
-      {/* Mobile Switcher Bar */}
-      <div className="lg:hidden border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-surface-900 p-2">
-        <Tabs value={mobileTab} onValueChange={(val) => setMobileTab(val as "visualizer" | "code")}>
-          <TabsList className="w-full grid grid-cols-2">
-            <TabsTrigger value="visualizer" className="gap-1">
-              <PlaySquare className="h-3 w-3" />
-              <span>Visualization</span>
-            </TabsTrigger>
-            <TabsTrigger value="code" className="gap-1">
-              <Code className="h-3 w-3" />
-              <span>Code & State</span>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
-      {/* Main Workspace Layout */}
-      <main className="flex-1 p-3 md:p-4 max-w-7xl w-full mx-auto flex flex-col gap-4">
-        {/* Visualizer Stage Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {/* Main Visualization Canvas & Operation Bar (7 cols desktop, 8 on xl) */}
-          <div
-            className={cn(
-              "lg:col-span-7 xl:col-span-8 flex flex-col gap-4",
-              mobileTab !== "visualizer" && "hidden lg:flex"
-            )}
-          >
-            {/* Visualizer Canvas Card */}
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-card dark:border-slate-800 dark:bg-surface-900 overflow-hidden flex flex-col">
-              {/* Canvas Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-surface-50 dark:bg-surface-950/60">
-                <div>
-                  <h1 className="text-sm font-bold text-slate-900 dark:text-white">
-                    Linked List Visualizer
-                  </h1>
-                  <p className="text-[11px] text-slate-500">
-                    Step through dynamic pointer manipulations across Singly, Doubly, and Circular lists.
-                  </p>
-                </div>
-                <span className="text-xs font-mono font-semibold text-brand-600 dark:text-brand-400">
-                  Step {engine.currentStepIndex + 1} of {engine.totalSteps}
-                </span>
-              </div>
-
-              {/* Main Linked List Stage Render */}
-              <div className="flex-1 min-h-[260px] flex items-center justify-center bg-radial-pattern">
-                <LinkedListRenderer
-                  visualizationState={visualizationState}
-                  resolvedHighlights={resolvedHighlights}
-                  speed={engine.speed}
-                />
-              </div>
-
-              {/* Authoritative Timeline Controls */}
-              <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-surface-50 dark:bg-surface-950/40">
-                <TimelineControls
-                  isPlaying={engine.isPlaying}
-                  currentStep={engine.currentStepIndex}
-                  totalSteps={engine.totalSteps}
-                  speed={
-                    (engine.speed === 0.5 || engine.speed === 1 || engine.speed === 1.5 || engine.speed === 2
-                      ? engine.speed
-                      : 1) as TimelinePlaybackSpeed
-                  }
-                  onPlay={engine.play}
-                  onPause={engine.pause}
-                  onStepForward={engine.next}
-                  onStepBackward={engine.previous}
-                  onGoToStart={engine.jumpToStart}
-                  onGoToEnd={engine.jumpToEnd}
-                  onSeek={engine.jumpTo}
-                  onSpeedChange={(s: TimelinePlaybackSpeed) => engine.setSpeed(s as ExecutionPlaybackSpeed)}
-                />
-              </div>
-            </div>
-
-            {/* Custom Input & Operations Selector Bar */}
-            <LinkedListOperationBar
-              variant={variant}
-              onSelectVariant={handleSelectVariant}
-              currentOperation={currentOperation}
-              onSelectOperation={handleSelectOperation}
-              onApplyCustomList={handleApplyCustomList}
-              onExecuteOperation={handleExecuteOperation}
-              listLength={listValues.length}
-            />
-
-            {/* Explanation Panel */}
-            <ExplanationPanel
-              explanation={executionView.explanation}
-              operation={executionView.operation}
-              codeLine={executionView.primaryCodeLine}
-              stepIndex={executionView.stepIndex}
-              totalSteps={executionView.totalSteps}
+  // VisuAlgo Actions
+  const actions: VisuAlgoAction[] = [
+    {
+      id: "insert",
+      label: "Insert",
+      popoverContent: (
+        <div className="space-y-3">
+          <div className="text-xs font-semibold text-foreground">Insert Node</div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Value:</span>
+            <input
+              type="number"
+              value={insertVal}
+              onChange={(e) => setInsertVal(e.target.value)}
+              className="w-16 px-2 py-1 text-xs rounded bg-muted/60 border border-border text-foreground font-mono"
             />
           </div>
-
-          {/* Right Column: Code, Variables & Complexity (5 cols desktop, 4 on xl) */}
-          <div
-            className={cn(
-              "lg:col-span-5 xl:col-span-4 flex flex-col gap-4",
-              mobileTab !== "code" && "hidden lg:flex"
-            )}
-          >
-            {/* Synchronized Code Viewer */}
-            <CodeViewer
-              sourceCode={executionView.sourceCode}
-              activeLines={executionView.activeCodeLines}
-              primaryLine={executionView.primaryCodeLine}
-              language={activeLanguage}
-              onLanguageChange={setActiveLanguage}
-              availableLanguages={["python", "typescript"]}
-              title="Synchronized Implementation"
-              className="flex-1 min-h-[220px]"
+          <div className="grid grid-cols-2 gap-1.5 pt-1">
+            <button
+              onClick={() => executeOp("insert-beginning", { value: parseInt(insertVal, 10) || 50 })}
+              className="px-2 py-1 text-xs font-medium rounded bg-muted hover:bg-primary/20 hover:text-primary transition-colors text-left"
+            >
+              At Head
+            </button>
+            <button
+              onClick={() => executeOp("insert-end", { value: parseInt(insertVal, 10) || 50 })}
+              className="px-2 py-1 text-xs font-medium rounded bg-muted hover:bg-primary/20 hover:text-primary transition-colors text-left"
+            >
+              At Tail
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5 pt-1 border-t border-border/50">
+            <span className="text-xs text-muted-foreground">Index:</span>
+            <input
+              type="number"
+              value={insertIdx}
+              onChange={(e) => setInsertIdx(e.target.value)}
+              className="w-12 px-1.5 py-1 text-xs rounded bg-muted/60 border border-border text-foreground font-mono"
             />
-
-            {/* Variables Inspector */}
-            <VariablesPanel
-              variables={executionView.variables}
-              variableDiffs={executionView.variableDiffs}
-              title="Runtime Variables"
-            />
-
-            {/* Asymptotic Complexity & Educational Information */}
-            <LinkedListComplexityCard operation={currentOperation} variant={variant} />
+            <button
+              onClick={() =>
+                executeOp("insert-position", {
+                  index: parseInt(insertIdx, 10) || 0,
+                  value: parseInt(insertVal, 10) || 50,
+                })
+              }
+              className="px-2.5 py-1 text-xs font-bold bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors ml-auto"
+            >
+              Insert At
+            </button>
           </div>
         </div>
-      </main>
-    </div>
+      ),
+    },
+    {
+      id: "delete",
+      label: "Delete",
+      popoverContent: (
+        <div className="space-y-3">
+          <div className="text-xs font-semibold text-foreground">Delete Node</div>
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              onClick={() => executeOp("delete-beginning")}
+              className="px-2 py-1 text-xs font-medium rounded bg-muted hover:bg-rose-500/20 hover:text-rose-600 transition-colors text-left"
+            >
+              Head
+            </button>
+            <button
+              onClick={() => executeOp("delete-end")}
+              className="px-2 py-1 text-xs font-medium rounded bg-muted hover:bg-rose-500/20 hover:text-rose-600 transition-colors text-left"
+            >
+              Tail
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5 pt-1 border-t border-border/50">
+            <span className="text-xs text-muted-foreground">Index:</span>
+            <input
+              type="number"
+              value={deleteIdx}
+              onChange={(e) => setDeleteIdx(e.target.value)}
+              className="w-12 px-1.5 py-1 text-xs rounded bg-muted/60 border border-border text-foreground font-mono"
+            />
+            <button
+              onClick={() => executeOp("delete-position", { index: parseInt(deleteIdx, 10) || 0 })}
+              className="px-2.5 py-1 text-xs font-bold bg-rose-600 text-white rounded hover:bg-rose-700 transition-colors ml-auto"
+            >
+              Delete At
+            </button>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "search",
+      label: "Search",
+      popoverContent: (
+        <div className="space-y-3">
+          <div className="text-xs font-semibold text-foreground">Search Value (v)</div>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={searchVal}
+              onChange={(e) => setSearchVal(e.target.value)}
+              placeholder="e.g. 20"
+              className="w-20 px-2 py-1 text-xs rounded bg-muted/60 border border-border text-foreground font-mono"
+            />
+            <button
+              onClick={() => executeOp("search", { value: parseInt(searchVal, 10) || 20 })}
+              className="px-3 py-1 text-xs font-bold bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+            >
+              Go
+            </button>
+          </div>
+          <div className="pt-2 border-t border-border/50">
+            <div className="text-[11px] text-muted-foreground mb-1">Preset Items:</div>
+            <div className="flex flex-wrap gap-1">
+              {listValues.slice(0, 4).map((val) => (
+                <button
+                  key={val}
+                  onClick={() => {
+                    setSearchVal(val.toString());
+                    executeOp("search", { value: val });
+                  }}
+                  className="px-2 py-0.5 text-[11px] rounded bg-muted hover:bg-primary/20 hover:text-primary transition-colors font-mono"
+                >
+                  v={val}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "traverse",
+      label: "Traverse",
+      onClick: () => executeOp("traverse"),
+    },
+    ...(variant !== "circular"
+      ? [
+          {
+            id: "reverse",
+            label: "Reverse",
+            onClick: () => executeOp("reverse"),
+          },
+        ]
+      : []),
+    {
+      id: "create",
+      label: "Create",
+      popoverContent: (
+        <div className="space-y-3">
+          <div className="text-xs font-semibold text-foreground">List Values</div>
+          <input
+            type="text"
+            value={customInput}
+            onChange={(e) => setCustomInput(e.target.value)}
+            placeholder="e.g. 10, 20, 30, 40"
+            className="w-full px-2 py-1 text-xs rounded bg-muted/60 border border-border text-foreground font-mono"
+          />
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <button
+              onClick={() => {
+                const len = Math.floor(Math.random() * 4) + 4;
+                const randomVals = Array.from({ length: len }, () => Math.floor(Math.random() * 90) + 10);
+                setListValues(randomVals);
+                engine.reset();
+              }}
+              className="px-2.5 py-1 text-xs font-medium rounded bg-muted hover:bg-primary/20 text-foreground transition-colors"
+            >
+              Random
+            </button>
+            <button
+              onClick={() => {
+                const parsed = customInput
+                  .split(",")
+                  .map((s) => parseInt(s.trim(), 10))
+                  .filter((n) => !isNaN(n));
+                if (parsed.length > 0) {
+                  setListValues(parsed);
+                  setCustomInput("");
+                  engine.reset();
+                }
+              }}
+              className="px-3 py-1 text-xs font-bold bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+            >
+              Go
+            </button>
+          </div>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <VisuAlgoShell
+      title="Linked List Visualizer"
+      category="Data Structures"
+      subVariants={[
+        { id: "singly", label: "Singly Linked List", active: variant === "singly" },
+        { id: "doubly", label: "Doubly Linked List", active: variant === "doubly" },
+        { id: "circular", label: "Circular Linked List", active: variant === "circular" },
+      ]}
+      activeSubVariant={variant}
+      onSelectSubVariant={(id) => handleSelectVariant(id as LinkedListVariant)}
+      actions={actions}
+      statusBadge={
+        engine.isPlaying
+          ? "Running"
+          : currentOperation.toUpperCase()
+      }
+      statusExplanation={
+        executionView.explanation ||
+        "Select an operation from the bottom-left dock to manipulate the list."
+      }
+      complexityBadge={
+        currentOperation === "insert-beginning" || currentOperation === "delete-beginning"
+          ? "O(1)"
+          : currentOperation === "search" || currentOperation === "traverse" || currentOperation === "reverse"
+          ? "O(n)"
+          : "O(n)"
+      }
+      code={executionView.sourceCode}
+      activeCodeLines={executionView.activeCodeLines}
+      currentStep={engine.currentStepIndex}
+      totalSteps={engine.totalSteps}
+      isPlaying={engine.isPlaying}
+      speed={engine.speed}
+      onPlay={engine.play}
+      onPause={engine.pause}
+      onStepForward={engine.next}
+      onStepBackward={engine.previous}
+      onGoToStart={engine.jumpToStart}
+      onGoToEnd={engine.jumpToEnd}
+      onSeek={engine.jumpTo}
+      onSpeedChange={(spd) => engine.setSpeed(spd)}
+      className={className}
+    >
+      {/* Full-stage Interactive Stage */}
+      <div className="w-full h-full flex flex-col items-center justify-center p-6 select-none overflow-x-auto">
+        <LinkedListRenderer
+          visualizationState={visualizationState}
+          resolvedHighlights={resolvedHighlights}
+          speed={engine.speed}
+        />
+      </div>
+    </VisuAlgoShell>
   );
 }

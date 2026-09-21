@@ -3,34 +3,31 @@ import { describe, it, expect } from "vitest";
 import { VisualizerShell } from "../visualizer-shell";
 
 describe("VisualizerShell Component", () => {
-  it("renders wireframe panels: topics, visualization, code, state, controls, explanation", () => {
+  it("renders VisuAlgo shell with canvas, code HUD, dock actions, and controls", () => {
     render(<VisualizerShell />);
 
-    // Check header and topics
-    expect(screen.getByText("Data Structures")).toBeInTheDocument();
-    expect(screen.getByText("Algorithms")).toBeInTheDocument();
-    expect(screen.getByText("Binary Search Code")).toBeInTheDocument();
+    // Check title and category
+    expect(screen.getByText("Binary Search")).toBeInTheDocument();
+    expect(screen.getByText("Searching Algorithms")).toBeInTheDocument();
 
-    // Check state inspector
-    expect(
-      screen.getByText("Variables / Data / Execution State")
-    ).toBeInTheDocument();
+    // Check dock actions
+    expect(screen.getByRole("button", { name: "Search" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reset" })).toBeInTheDocument();
 
     // Check timeline controls
     expect(screen.getByRole("button", { name: /play/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/first step/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/next step/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/step forward/i)).toBeInTheDocument();
 
-    // Check step 1 content initially
-    expect(screen.getByText("Initialize Search Pointers")).toBeInTheDocument();
+    // Check initial step explanation
+    expect(screen.getByText("Initialize Pointers")).toBeInTheDocument();
     expect(screen.getByText(/Set left pointer to index 0/i)).toBeInTheDocument();
-    expect(screen.getByText(/Why this step\?/i)).toBeInTheDocument();
   });
 
-  it("advances step when Next button is clicked", () => {
+  it("advances step when Step forward button is clicked", () => {
     render(<VisualizerShell />);
 
-    const nextButton = screen.getByLabelText(/next step/i);
+    const nextButton = screen.getByLabelText(/step forward/i);
     fireEvent.click(nextButton);
 
     // Step 2 action is "Calculate Midpoint"

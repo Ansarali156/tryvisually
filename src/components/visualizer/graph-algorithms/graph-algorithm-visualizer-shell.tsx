@@ -6,6 +6,7 @@ import type { GraphState } from "@/core/graph/types";
 import {
   createSampleUndirectedWeightedGraph,
   createSampleDirectedGraph,
+  generateRandomGraph,
 } from "@/core/graph/sample-graphs";
 import type { GraphAlgorithmType, GraphAlgorithmExecutionState } from "@/core/graph-algorithms/types";
 import {
@@ -20,29 +21,22 @@ import {
 import { GRAPH_ALGORITHM_SNIPPETS } from "@/core/graph-algorithms/code-snippets";
 import { useExecutionEngine } from "@/core/execution/hooks/use-execution-engine";
 import type { SupportedLanguage } from "@/core/synchronization/types";
-import { TopicBar } from "@/components/visualizer/topic-bar";
 import { GraphCanvas } from "@/components/visualizer/graph/graph-canvas";
-import { TimelineControls } from "@/components/ui/timeline-controls";
-import { CodeViewer } from "@/components/code/code-viewer";
-import { VariablesPanel } from "@/components/execution/variables-panel";
-import { ExplanationPanel } from "@/components/execution/explanation-panel";
-import { Button } from "@/components/ui/button";
-import type { PlaybackSpeed } from "@/core/engine/types";
-import { Play, Network } from "lucide-react";
+import { VisuAlgoShell, type VisuAlgoAction } from "@/components/visualizer/visualgo-shell";
 
 interface Props {
   initialAlgorithm?: GraphAlgorithmType;
   className?: string;
 }
 
-const ALGORITHMS: { id: GraphAlgorithmType; name: string; category: string }[] = [
-  { id: "bfs", name: "BFS (Breadth-First)", category: "Traversal" },
-  { id: "dfs", name: "DFS (Depth-First)", category: "Traversal" },
-  { id: "dijkstra", name: "Dijkstra's Algorithm", category: "Shortest Path" },
-  { id: "bellman-ford", name: "Bellman-Ford", category: "Shortest Path" },
-  { id: "prim", name: "Prim's Algorithm", category: "MST" },
-  { id: "kruskal", name: "Kruskal's Algorithm", category: "MST" },
-  { id: "topological-sort", name: "Topological Sort", category: "DAG" },
+const ALGORITHMS: { id: GraphAlgorithmType; name: string; complexity: string }[] = [
+  { id: "bfs", name: "BFS", complexity: "O(V + E)" },
+  { id: "dfs", name: "DFS", complexity: "O(V + E)" },
+  { id: "dijkstra", name: "Dijkstra", complexity: "O((V + E) log V)" },
+  { id: "bellman-ford", name: "Bellman-Ford", complexity: "O(V × E)" },
+  { id: "prim", name: "Prim's MST", complexity: "O(E log V)" },
+  { id: "kruskal", name: "Kruskal's MST", complexity: "O(E log E)" },
+  { id: "topological-sort", name: "Topological Sort", complexity: "O(V + E)" },
 ];
 
 export function GraphAlgorithmVisualizerShell({
@@ -104,10 +98,13 @@ export function GraphAlgorithmVisualizerShell({
     createTrace(selectedAlgorithm, graphState, startNodeId)
   );
 
-  const runAlgorithm = React.useCallback(() => {
-    const newTrace = createTrace(selectedAlgorithm, graphState, startNodeId);
-    setTrace(newTrace);
-  }, [createTrace, selectedAlgorithm, graphState, startNodeId]);
+  const runAlgorithm = React.useCallback(
+    (algo: GraphAlgorithmType = selectedAlgorithm, startId: string = startNodeId) => {
+      const newTrace = createTrace(algo, graphState, startId);
+      setTrace(newTrace);
+    },
+    [createTrace, selectedAlgorithm, graphState, startNodeId]
+  );
 
   const engine = useExecutionEngine<GraphAlgorithmExecutionState>(trace, { initialSpeed: 1 });
   const currentStep = engine.currentStep;
@@ -134,223 +131,166 @@ export function GraphAlgorithmVisualizerShell({
 
   const activeLine = currentStep?.codeLine ?? 1;
 
-  // Node label map
-  const nodeMap = React.useMemo(() => {
-    const map = new Map<string, string>();
-    for (const n of graphState.nodes) map.set(n.id, n.label);
-    return map;
-  }, [graphState.nodes]);
+  const currentAlgoMeta = ALGORITHMS.find((a) => a.id === selectedAlgorithm) || ALGORITHMS[0];
+
+  const actions: VisuAlgoAction[] = [
+    {
+      id: "run",
+      label: selectedAlgorithm === "kruskal" || selectedAlgorithm === "topological-sort" ? "Run" : "Execute",
+      popoverContent: (
+        <div className="space-y-3">
+          <div className="text-xs font-semibold text-foreground">
+            {selectedAlgorithm === "kruskal" || selectedAlgorithm === "topological-sort"
+              ? "Start Execution"
+              : "Select Start Vertex (s)"}
+          </div>
+          {selectedAlgorithm !== "kruskal" && selectedAlgorithm !== "topological-sort" && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Source:</span>
+              <select
+                value={startNodeId}
+                onChange={(e) => {
+                  setStartNodeId(e.target.value);
+                  runAlgorithm(selectedAlgorithm, e.target.value);
+                }}
+                className="px-2 py-1 text-xs rounded bg-muted/60 border border-border text-foreground font-mono"
+              >
+                {graphState.nodes.map((n) => (
+                  <option key={n.id} value={n.id}>
+                    Node {n.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <button
+            onClick={() => {
+              runAlgorithm(selectedAlgorithm, startNodeId);
+              setTimeout(() => engine.play(), 50);
+            }}
+            className="px-3 py-1 text-xs font-bold bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors w-full"
+          >
+            Start {currentAlgoMeta.name}
+          </button>
+        </div>
+      ),
+    },
+    {
+      id: "randomize",
+      label: "Random Graph",
+      onClick: () => {
+        const rand = generateRandomGraph({
+          nodeCount: 5,
+          directed: selectedAlgorithm === "topological-sort",
+          weighted: true,
+        });
+        setGraphState(rand);
+        if (rand.nodes[0]) {
+          setStartNodeId(rand.nodes[0].id);
+          const newTrace = createTrace(selectedAlgorithm, rand, rand.nodes[0].id);
+          setTrace(newTrace);
+        }
+      },
+    },
+    {
+      id: "reset",
+      label: "Reset Sample",
+      onClick: () => {
+        const sample =
+          selectedAlgorithm === "topological-sort"
+            ? createSampleDirectedGraph()
+            : createSampleUndirectedWeightedGraph();
+        setGraphState(sample);
+        if (sample.nodes[0]) {
+          setStartNodeId(sample.nodes[0].id);
+          const newTrace = createTrace(selectedAlgorithm, sample, sample.nodes[0].id);
+          setTrace(newTrace);
+        }
+      },
+    },
+  ];
 
   return (
-    <div className={cn("min-h-screen flex flex-col bg-background text-foreground", className)}>
-      <TopicBar />
+    <VisuAlgoShell
+      title="Graph Algorithms Visualizer"
+      category="Graph Theory"
+      subVariants={ALGORITHMS.map((algo) => ({
+        id: algo.id,
+        label: algo.name,
+        active: selectedAlgorithm === algo.id,
+      }))}
+      activeSubVariant={selectedAlgorithm}
+      onSelectSubVariant={(id) => {
+        const algo = id as GraphAlgorithmType;
+        setSelectedAlgorithm(algo);
+        const nextGraph =
+          algo === "topological-sort"
+            ? createSampleDirectedGraph()
+            : createSampleUndirectedWeightedGraph();
+        setGraphState(nextGraph);
+        const sId = nextGraph.nodes[0]?.id || "";
+        setStartNodeId(sId);
+        setTrace(createTrace(algo, nextGraph, sId));
+      }}
+      actions={actions}
+      statusBadge={
+        engine.isPlaying
+          ? "Running"
+          : selectedAlgorithm.toUpperCase()
+      }
+      statusExplanation={
+        currentStep?.explanation ||
+        runtimeState?.phaseDescription ||
+        `Select an action from the bottom-left dock to run ${currentAlgoMeta.name}.`
+      }
+      complexityBadge={currentAlgoMeta.complexity}
+      code={rawSourceCode}
+      activeCodeLines={[activeLine]}
+      currentStep={engine.currentStepIndex}
+      totalSteps={engine.totalSteps}
+      isPlaying={engine.isPlaying}
+      speed={engine.speed}
+      onPlay={engine.play}
+      onPause={engine.pause}
+      onStepForward={engine.next}
+      onStepBackward={engine.previous}
+      onGoToStart={engine.jumpToStart}
+      onGoToEnd={engine.jumpToEnd}
+      onSeek={engine.jumpTo}
+      onSpeedChange={(spd) => engine.setSpeed(spd)}
+      className={className}
+    >
+      {/* Full-stage Interactive Stage */}
+      <div className="w-full h-full flex flex-col items-center justify-center p-4 select-none relative overflow-hidden">
+        <GraphCanvas
+          graphState={graphState}
+          highlightedElementIds={highlightedElements}
+          className="w-full h-full"
+        />
 
-      <main className="flex-1 flex flex-col p-4 md:p-6 max-w-[1700px] w-full mx-auto gap-4">
-        {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-2 border-b border-border">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-              <Network className="w-6 h-6 text-primary" />
-              Graph Algorithms Visualizer
-            </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Explore deterministic step-by-step graph traversals, shortest paths, and spanning trees.
-            </p>
-          </div>
+        {/* Algorithm Live Metrics Overlay at Top */}
+        <div className="absolute top-4 right-4 z-10 flex flex-wrap gap-2 pointer-events-none max-w-md justify-end">
+          {runtimeState?.visitedVertexIds && runtimeState.visitedVertexIds.length > 0 && (
+            <div className="bg-card/90 backdrop-blur-md border border-border/80 px-3 py-1.5 rounded-lg shadow-sm text-xs flex items-center gap-2">
+              <span className="text-muted-foreground font-medium">Visited:</span>
+              <span className="font-mono font-bold text-primary">
+                {runtimeState.visitedVertexIds
+                  .map((id) => graphState.nodes.find((n) => n.id === id)?.label || id)
+                  .join(" → ")}
+              </span>
+            </div>
+          )}
 
-          <div className="flex flex-wrap items-center gap-2">
-            {ALGORITHMS.map((algo) => (
-              <Button
-                key={algo.id}
-                variant={selectedAlgorithm === algo.id ? "primary" : "outline"}
-                size="sm"
-                className="text-xs h-8"
-                onClick={() => {
-                  setSelectedAlgorithm(algo.id);
-                  const newTrace = createTrace(algo.id, graphState, startNodeId);
-                  setTrace(newTrace);
-                }}
-              >
-                {algo.name}
-              </Button>
-            ))}
-          </div>
+          {runtimeState?.treeEdgeIds && runtimeState.treeEdgeIds.length > 0 && (
+            <div className="bg-card/90 backdrop-blur-md border border-border/80 px-3 py-1.5 rounded-lg shadow-sm text-xs flex items-center gap-2">
+              <span className="text-muted-foreground font-medium">Tree Edges:</span>
+              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                {runtimeState.treeEdgeIds.length}
+              </span>
+            </div>
+          )}
         </div>
-
-        {/* Options & Execution Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-muted/40 p-3 rounded-lg border border-border">
-          <div className="flex items-center gap-3">
-            {selectedAlgorithm !== "kruskal" && selectedAlgorithm !== "topological-sort" && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-muted-foreground">Start Vertex:</span>
-                <select
-                  value={startNodeId}
-                  onChange={(e) => {
-                    setStartNodeId(e.target.value);
-                    const newTrace = createTrace(selectedAlgorithm, graphState, e.target.value);
-                    setTrace(newTrace);
-                  }}
-                  className="bg-background border border-border text-foreground text-xs rounded px-2 py-1 outline-none"
-                >
-                  {graphState.nodes.map((node) => (
-                    <option key={node.id} value={node.id}>
-                      Vertex {node.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <Button size="sm" onClick={runAlgorithm} className="h-8 gap-1.5">
-              <Play className="w-3.5 h-3.5" />
-              Run Algorithm
-            </Button>
-          </div>
-
-          <div className="text-xs font-medium text-muted-foreground max-w-xl truncate">
-            {runtimeState?.phaseDescription || "Ready to execute"}
-          </div>
-        </div>
-
-        {/* Primary Visualization Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1">
-          {/* Canvas Area */}
-          <div className="lg:col-span-8 flex flex-col gap-3 min-h-[520px]">
-            <div className="flex-1 relative rounded-xl border border-border bg-card overflow-hidden min-h-[460px]">
-              <GraphCanvas
-                graphState={graphState}
-                highlightedElementIds={highlightedElements}
-                selectedNodeId={runtimeState?.currentVertexId}
-                selectedEdgeId={runtimeState?.activeEdgeId}
-                className="w-full h-full min-h-[460px]"
-              />
-
-              {/* Data Structure Live State Overlay */}
-              <div className="absolute top-3 right-3 max-w-xs w-full bg-background/90 backdrop-blur border border-border rounded-lg p-2.5 shadow-sm text-xs flex flex-col gap-1.5">
-                <div className="font-semibold text-foreground flex items-center justify-between border-b border-border pb-1">
-                  <span>Data Structure State</span>
-                  <span className="text-[10px] text-muted-foreground uppercase">{selectedAlgorithm}</span>
-                </div>
-
-                {/* BFS Queue */}
-                {selectedAlgorithm === "bfs" && (
-                  <div>
-                    <span className="text-muted-foreground">Queue (FIFO): </span>
-                    <span className="font-mono font-medium">
-                      [{runtimeState?.frontierIds.map((id) => nodeMap.get(id) ?? id).join(", ") || "empty"}]
-                    </span>
-                  </div>
-                )}
-
-                {/* DFS Stack */}
-                {selectedAlgorithm === "dfs" && (
-                  <div>
-                    <span className="text-muted-foreground">Call Stack (LIFO): </span>
-                    <span className="font-mono font-medium">
-                      [{runtimeState?.frontierIds.map((id) => nodeMap.get(id) ?? id).join(" -> ") || "empty"}]
-                    </span>
-                  </div>
-                )}
-
-                {/* Shortest Path Distances */}
-                {(selectedAlgorithm === "dijkstra" || selectedAlgorithm === "bellman-ford") && (
-                  <div className="flex flex-col gap-1 max-h-36 overflow-y-auto">
-                    <span className="text-muted-foreground">Distances from Source:</span>
-                    <div className="grid grid-cols-3 gap-1 font-mono text-[11px]">
-                      {graphState.nodes.map((n) => {
-                        const d = runtimeState?.distances?.[n.id];
-                        return (
-                          <div key={n.id} className="bg-muted/50 p-1 rounded text-center">
-                            {n.label}: {d === Infinity || d === undefined ? "∞" : d}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* MST Edges */}
-                {(selectedAlgorithm === "prim" || selectedAlgorithm === "kruskal") && (
-                  <div>
-                    <span className="text-muted-foreground">MST Edges ({runtimeState?.treeEdgeIds.length ?? 0}):</span>
-                    <div className="font-mono text-[11px] mt-0.5 text-emerald-600 dark:text-emerald-400">
-                      {runtimeState?.treeEdgeIds.length === 0
-                        ? "None yet"
-                        : runtimeState?.treeEdgeIds.map((eid) => {
-                            const e = graphState.edges.find((x) => x.id === eid);
-                            if (!e) return eid;
-                            return `${nodeMap.get(e.sourceId)}-${nodeMap.get(e.targetId)}(${e.weight ?? 1})`;
-                          }).join(", ")}
-                    </div>
-                  </div>
-                )}
-
-                {/* Topological Order */}
-                {selectedAlgorithm === "topological-sort" && (
-                  <div>
-                    <span className="text-muted-foreground">Topological Order: </span>
-                    <div className="font-mono font-medium text-emerald-600 dark:text-emerald-400 mt-0.5">
-                      {runtimeState?.topologicalOrder && runtimeState.topologicalOrder.length > 0
-                        ? runtimeState.topologicalOrder.join(" → ")
-                        : "Processing..."}
-                    </div>
-                    {runtimeState?.cycleDetected && (
-                      <div className="text-destructive font-semibold mt-1">Cycle Detected in Graph!</div>
-                    )}
-                  </div>
-                )}
-
-                <div className="text-[11px] text-muted-foreground border-t border-border pt-1">
-                  Visited ({runtimeState?.visitedVertexIds.length ?? 0}): [
-                  {runtimeState?.visitedVertexIds.map((id) => nodeMap.get(id) ?? id).join(", ")}]
-                </div>
-              </div>
-            </div>
-
-            {/* Timeline Controls */}
-            <TimelineControls
-              isPlaying={engine.isPlaying}
-              currentStep={engine.currentStepIndex}
-              totalSteps={engine.totalSteps}
-              speed={engine.speed as PlaybackSpeed}
-              onPlay={engine.play}
-              onPause={engine.pause}
-              onStepForward={engine.next}
-              onStepBackward={engine.previous}
-              onGoToStart={engine.jumpToStart}
-              onGoToEnd={engine.jumpToEnd}
-              onSeek={engine.jumpTo}
-              onSpeedChange={(spd: PlaybackSpeed) => engine.setSpeed(spd)}
-            />
-          </div>
-
-          {/* Right Panel: Code & Variables */}
-          <div className="lg:col-span-4 flex flex-col gap-3">
-            <div className="rounded-xl border border-border bg-card overflow-hidden flex flex-col min-h-[300px]">
-              <CodeViewer
-                rawCode={rawSourceCode}
-                language={activeLanguage}
-                onLanguageChange={setActiveLanguage}
-                activeLines={[activeLine]}
-                primaryLine={activeLine}
-              />
-            </div>
-
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
-              <VariablesPanel variables={currentStep?.variables ?? {}} />
-            </div>
-
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
-              <ExplanationPanel
-                title="Current Step"
-                explanation={currentStep?.explanation ?? "Click Run to begin traversal."}
-                stepIndex={engine.currentStepIndex}
-                totalSteps={engine.totalSteps}
-              />
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
+      </div>
+    </VisuAlgoShell>
   );
 }

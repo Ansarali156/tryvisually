@@ -2,19 +2,11 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { TopicBar } from "./topic-bar";
-import { StateInspector } from "./state-inspector";
-import { ExplanationCard } from "./explanation-card";
-import { CodePanel } from "@/components/ui/code-panel";
-import { VisualizationPanel } from "@/components/ui/visualization-panel";
-import { TimelineControls } from "@/components/ui/timeline-controls";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { VisuAlgoShell, VisuAlgoAction } from "./visualgo-shell";
 import { playbackReducer, createInitialPlaybackState } from "@/core/engine/playback-reducer";
-import { ExecutionTrace, TraceStep } from "@/core/engine/types";
-import { Sparkles, Layers, Code, PlaySquare, ArrowLeft } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { ExecutionTrace, TraceStep, PlaybackSpeed } from "@/core/engine/types";
+import { Search, RotateCcw } from "lucide-react";
+import type { SupportedLanguage } from "@/core/synchronization/types";
 
 export interface VisualizerShellProps {
   initialTrace?: ExecutionTrace;
@@ -22,11 +14,11 @@ export interface VisualizerShellProps {
   className?: string;
 }
 
-// Foundation dummy trace illustrating the architectural synchronization contract
+// Foundation trace for binary search
 const FOUNDATION_TRACE: ExecutionTrace = {
   algorithmId: "binary-search",
   algorithmName: "Binary Search",
-  category: "Algorithms",
+  category: "Searching Algorithms",
   code: {
     language: "typescript",
     source: `function binarySearch(arr: number[], target: number): number {
@@ -56,7 +48,7 @@ const FOUNDATION_TRACE: ExecutionTrace = {
   steps: [
     {
       stepIndex: 0,
-      action: "Initialize Search Pointers",
+      action: "Initialize Pointers",
       explanation: "Set left pointer to index 0 and right pointer to index 6 (end of array).",
       why: "Binary search requires search boundaries covering the entire sorted sequence initially.",
       codeLines: [2, 3],
@@ -173,13 +165,7 @@ export function VisualizerShell({
   selectedTopicId = "binary-search",
   className,
 }: VisualizerShellProps) {
-  const router = useRouter();
-  const [selectedTopic, setSelectedTopic] = React.useState(selectedTopicId);
-  const [mobileTab, setMobileTab] = React.useState("visualizer");
-
-  React.useEffect(() => {
-    setSelectedTopic(selectedTopicId);
-  }, [selectedTopicId]);
+  const [activeLanguage, setActiveLanguage] = React.useState<SupportedLanguage>("typescript");
 
   const [playbackState, dispatch] = React.useReducer(
     playbackReducer,
@@ -202,152 +188,134 @@ export function VisualizerShell({
   const currentStepData: TraceStep | undefined =
     initialTrace.steps[playbackState.currentStep];
 
+  // VisuAlgo Actions
+  const actions: VisuAlgoAction[] = [
+    {
+      id: "search",
+      label: "Search",
+      icon: Search,
+      description: "Search for a value in the sorted array using Binary Search",
+      params: [
+        {
+          name: "target",
+          label: "Target value",
+          type: "number",
+          defaultValue: 7,
+          placeholder: "e.g. 7",
+        },
+      ],
+      presets: [
+        { label: "Target: 7 (Found)", values: { target: 7 } },
+        { label: "Target: 1 (Found)", values: { target: 1 } },
+        { label: "Target: 13 (Found)", values: { target: 13 } },
+        { label: "Target: 2 (Not Found)", values: { target: 2 } },
+      ],
+      onExecute: () => {
+        dispatch({ type: "GO_TO_START" });
+        dispatch({ type: "PLAY" });
+      },
+    },
+    {
+      id: "reset",
+      label: "Reset",
+      icon: RotateCcw,
+      description: "Reset execution to step 0",
+      onExecute: () => {
+        dispatch({ type: "GO_TO_START" });
+      },
+    },
+  ];
+
+  const statusColors = {
+    default: "bg-white border-slate-300 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200",
+    active: "bg-cyan-600 border-cyan-500 text-white shadow-lg scale-110 ring-4 ring-cyan-500/30",
+    comparing: "bg-amber-400 border-amber-500 text-slate-900 font-bold shadow-lg scale-105 ring-4 ring-amber-500/30",
+    swapping: "bg-rose-500 border-rose-600 text-white shadow-md scale-105",
+    sorted: "bg-emerald-500 border-emerald-600 text-white font-bold shadow-md",
+    visited: "bg-sky-100 border-sky-400 text-sky-900 dark:bg-sky-950 dark:text-sky-200",
+    inserted: "bg-emerald-100 border-emerald-400 text-emerald-900",
+    deleted: "bg-rose-100 border-rose-400 text-rose-900 line-through opacity-50",
+  };
+
   return (
-    <div className={cn("flex flex-col min-h-screen bg-surface-100 dark:bg-surface-950", className)}>
-      {/* Compact Horizontal Topic Bar */}
-      <TopicBar currentSlug={selectedTopic || "binary-search"} />
+    <VisuAlgoShell
+      title={initialTrace.algorithmName}
+      category={initialTrace.category}
+      currentAction={currentStepData?.action || "Ready"}
+      stepExplanation={currentStepData?.explanation || "Execution ready."}
+      whyExplanation={currentStepData?.why}
+      timeComplexity={currentStepData?.complexitySnapshot?.time || initialTrace.metadata?.worstTimeComplexity}
+      spaceComplexity={currentStepData?.complexitySnapshot?.space || initialTrace.metadata?.spaceComplexity}
+      currentStep={playbackState.currentStep}
+      totalSteps={playbackState.totalSteps}
+      isPlaying={playbackState.isPlaying}
+      speed={playbackState.speed}
+      onPlay={() => dispatch({ type: "PLAY" })}
+      onPause={() => dispatch({ type: "PAUSE" })}
+      onStepForward={() => dispatch({ type: "STEP_FORWARD" })}
+      onStepBackward={() => dispatch({ type: "STEP_BACKWARD" })}
+      onGoToStart={() => dispatch({ type: "GO_TO_START" })}
+      onGoToEnd={() => dispatch({ type: "GO_TO_END" })}
+      onSeek={(step) => dispatch({ type: "SEEK", step })}
+      onSpeedChange={(speed) => dispatch({ type: "SET_SPEED", speed: speed as PlaybackSpeed })}
+      actions={actions}
+      code={initialTrace.code.source}
+      activeCodeLines={currentStepData?.codeLines || []}
+      language={activeLanguage}
+      onLanguageChange={setActiveLanguage}
+      className={className}
+    >
+      {/* Dominant VisuAlgo Canvas Viewport */}
+      <div className="flex flex-col items-center justify-center gap-8 w-full max-w-4xl py-12 select-none">
+        {/* Visual Array / Nodes */}
+        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 p-6 bg-white/80 dark:bg-slate-900/80 rounded-2xl border border-slate-200/90 dark:border-slate-800/90 shadow-xl backdrop-blur-sm max-w-full">
+          {currentStepData?.visualState.nodes.map((node, idx) => {
+            const pointer = currentStepData.visualState.pointers?.find(
+              (p) => p.index === idx || p.targetNodeId === node.id
+            );
 
-      {/* Mobile Switcher Bar */}
-      <div className="lg:hidden border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-surface-900 p-2">
-        <Tabs value={mobileTab} onValueChange={setMobileTab}>
-          <TabsList className="w-full grid grid-cols-2">
-            <TabsTrigger value="visualizer" className="gap-1">
-              <PlaySquare className="h-3 w-3" />
-              <span>Visualization</span>
-            </TabsTrigger>
-            <TabsTrigger value="code" className="gap-1">
-              <Code className="h-3 w-3" />
-              <span>Code & State</span>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
-      {/* Main Visualizer Workspace Layout */}
-      <div className="flex-1 p-3 md:p-4 max-w-7xl w-full mx-auto flex flex-col gap-3">
-        {/* Desktop 2-Panel View / Mobile Responsive Tabs */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[360px] md:min-h-[420px]">
-          {/* Main Visualization Canvas */}
-          <div
-            className={cn(
-              "lg:col-span-7 xl:col-span-8 h-full flex flex-col",
-              mobileTab !== "visualizer" && "hidden lg:flex"
-            )}
-          >
-            <VisualizationPanel
-              title={initialTrace.algorithmName}
-              statusText={playbackState.isFinished ? "Completed" : playbackState.isPlaying ? "Running" : "Paused"}
-              className="flex-1"
-            >
-              {/* Foundation Visualizer Rendering Viewport */}
-              <div className="flex flex-col items-center justify-center gap-6 w-full">
-                {/* Visual Array / Node Container */}
-                <div className="flex flex-wrap items-center justify-center gap-2 p-4 bg-white dark:bg-surface-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm max-w-full">
-                  {currentStepData?.visualState.nodes.map((node, idx) => {
-                    const pointer = currentStepData.visualState.pointers?.find(
-                      (p) => p.index === idx || p.targetNodeId === node.id
-                    );
-
-                    const statusColors = {
-                      default:
-                        "bg-surface-50 border-slate-300 text-slate-700 dark:bg-surface-800 dark:border-slate-700 dark:text-slate-200",
-                      active:
-                        "bg-brand-600 border-brand-500 text-white shadow-md scale-105",
-                      comparing:
-                        "bg-amber-400 border-amber-500 text-slate-900 font-bold shadow-md scale-105",
-                      swapping:
-                        "bg-rose-500 border-rose-600 text-white",
-                      sorted:
-                        "bg-emerald-500 border-emerald-600 text-white font-bold",
-                      visited:
-                        "bg-sky-100 border-sky-400 text-sky-900 dark:bg-sky-950 dark:text-sky-200",
-                      inserted:
-                        "bg-emerald-100 border-emerald-400 text-emerald-900",
-                      deleted:
-                        "bg-rose-100 border-rose-400 text-rose-900 line-through opacity-50",
-                    };
-
-                    return (
-                      <div key={node.id} className="flex flex-col items-center gap-1">
-                        {/* Pointer indicator */}
-                        <div className="h-4 text-[10px] font-bold text-brand-600 dark:text-brand-400 font-mono">
-                          {pointer?.label || " "}
-                        </div>
-
-                        {/* Node element */}
-                        <div
-                          className={cn(
-                            "w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-lg border-2 font-mono text-sm font-semibold transition-all duration-300",
-                            statusColors[node.status] || statusColors.default
-                          )}
-                        >
-                          {String(node.label)}
-                        </div>
-
-                        {/* Index indicator */}
-                        <span className="text-[10px] font-mono text-slate-400">
-                          {idx}
-                        </span>
-                      </div>
-                    );
-                  })}
+            return (
+              <div key={node.id} className="flex flex-col items-center gap-1.5">
+                {/* Pointer indicator */}
+                <div className="h-5 text-xs font-mono font-bold text-cyan-600 dark:text-cyan-400">
+                  {pointer?.label || " "}
                 </div>
 
-                <div className="text-xs text-slate-400 font-mono text-center">
-                  Visualization synchronized directly with execution trace step #{playbackState.currentStep + 1}
+                {/* Node element */}
+                <div
+                  className={cn(
+                    "w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-xl border-2 font-mono text-base font-bold transition-all duration-300",
+                    statusColors[node.status] || statusColors.default
+                  )}
+                >
+                  {String(node.label)}
                 </div>
+
+                {/* Index indicator */}
+                <span className="text-[11px] font-mono text-slate-400">
+                  [{idx}]
+                </span>
               </div>
-            </VisualizationPanel>
-          </div>
-
-          {/* Right: Synchronized Code Panel (25% width on desktop) */}
-          <div
-            className={cn(
-              "lg:col-span-5 xl:col-span-4 h-full",
-              mobileTab !== "code" && "hidden lg:block"
-            )}
-          >
-            <CodePanel
-              code={initialTrace.code.source}
-              language={initialTrace.code.language}
-              activeLines={currentStepData?.codeLines || []}
-              title={`${initialTrace.algorithmName} Code`}
-              className="h-full min-h-[300px]"
-            />
-          </div>
+            );
+          })}
         </div>
 
-        {/* State / Variables Inspector */}
-        <StateInspector
-          variables={currentStepData?.variables || []}
-          className="w-full"
-        />
-
-        {/* Playback Controls Toolbar */}
-        <TimelineControls
-          currentStep={playbackState.currentStep}
-          totalSteps={playbackState.totalSteps}
-          isPlaying={playbackState.isPlaying}
-          speed={playbackState.speed}
-          onPlay={() => dispatch({ type: "PLAY" })}
-          onPause={() => dispatch({ type: "PAUSE" })}
-          onStepForward={() => dispatch({ type: "STEP_FORWARD" })}
-          onStepBackward={() => dispatch({ type: "STEP_BACKWARD" })}
-          onGoToStart={() => dispatch({ type: "GO_TO_START" })}
-          onGoToEnd={() => dispatch({ type: "GO_TO_END" })}
-          onSeek={(step) => dispatch({ type: "SEEK", step })}
-          onSpeedChange={(speed) => dispatch({ type: "SET_SPEED", speed })}
-        />
-
-        {/* Explanation Card (WHAT and WHY) */}
-        <ExplanationCard
-          actionTitle={currentStepData?.action || "Ready"}
-          explanation={currentStepData?.explanation || "Execution paused."}
-          why={currentStepData?.why}
-          timeComplexity={currentStepData?.complexitySnapshot?.time}
-          spaceComplexity={currentStepData?.complexitySnapshot?.space}
-        />
+        {/* Legend */}
+        <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-mono text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded bg-cyan-600" />
+            <span>Target / Match</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded bg-amber-400" />
+            <span>Midpoint Inspection</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600" />
+            <span>Search Range</span>
+          </div>
+        </div>
       </div>
-    </div>
+    </VisuAlgoShell>
   );
 }

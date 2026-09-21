@@ -214,6 +214,258 @@ const ALL_TOPICS: TopicCardItem[] = [
   },
 ];
 
+function TopicVisualPreview({ slug }: { slug: string }) {
+  switch (slug) {
+    case "arrays":
+      return (
+        <div className="w-full h-20 bg-slate-100/70 dark:bg-surface-900/60 rounded-lg flex items-center justify-center gap-1.5 px-3 overflow-hidden border border-slate-200/50 dark:border-slate-800/50">
+          {[15, 23, 42, 57, 89].map((v, i) => (
+            <div
+              key={i}
+              className={cn(
+                "w-9 h-9 rounded-md border flex flex-col items-center justify-center font-mono text-xs font-bold transition-transform group-hover:scale-105",
+                i === 2
+                  ? "bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border-cyan-500/40 shadow-xs"
+                  : "bg-white dark:bg-surface-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+              )}
+            >
+              <span>{v}</span>
+              <span className="text-[8px] text-slate-400 font-normal">[{i}]</span>
+            </div>
+          ))}
+        </div>
+      );
+    case "linked-lists":
+      return (
+        <div className="w-full h-20 bg-slate-100/70 dark:bg-surface-900/60 rounded-lg flex items-center justify-center gap-1 px-3 overflow-hidden border border-slate-200/50 dark:border-slate-800/50">
+          {[12, 25, 40].map((v, i) => (
+            <React.Fragment key={i}>
+              <div className="flex items-center rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-surface-800 overflow-hidden shadow-xs">
+                <span className="w-7 h-7 flex items-center justify-center font-mono text-xs font-bold text-slate-800 dark:text-slate-200 bg-cyan-500/10 dark:bg-cyan-500/20 border-r border-slate-200 dark:border-slate-700">
+                  {v}
+                </span>
+                <span className="w-3.5 h-7 flex items-center justify-center text-[10px] text-slate-400 font-mono">
+                  •
+                </span>
+              </div>
+              <span className="text-cyan-600 dark:text-cyan-400 font-bold text-xs">→</span>
+            </React.Fragment>
+          ))}
+          <span className="text-slate-400 font-mono text-xs font-bold">∅</span>
+        </div>
+      );
+    case "stack":
+      return (
+        <div className="w-full h-20 bg-slate-100/70 dark:bg-surface-900/60 rounded-lg flex flex-col-reverse items-center justify-center gap-1 p-2 overflow-hidden border border-slate-200/50 dark:border-slate-800/50">
+          {[15, 28, 42].map((v, i) => (
+            <div
+              key={i}
+              className={cn(
+                "w-28 h-5 rounded border flex items-center justify-between px-2 font-mono text-[11px] font-bold transition-transform",
+                i === 2
+                  ? "bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border-cyan-500/50 shadow-xs"
+                  : "bg-white dark:bg-surface-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+              )}
+            >
+              <span>val: {v}</span>
+              {i === 2 && <span className="text-[8px] uppercase font-bold text-cyan-500">TOP</span>}
+            </div>
+          ))}
+        </div>
+      );
+    case "queue":
+      return (
+        <div className="w-full h-20 bg-slate-100/70 dark:bg-surface-900/60 rounded-lg flex items-center justify-center gap-1.5 px-3 overflow-hidden border border-slate-200/50 dark:border-slate-800/50">
+          <span className="text-[9px] font-mono font-bold text-cyan-600 dark:text-cyan-400 uppercase">FRONT</span>
+          <div className="flex items-center gap-1 border-y-2 border-dashed border-slate-300 dark:border-slate-700 py-1 px-1">
+            {[10, 20, 30, 40].map((v, i) => (
+              <div
+                key={i}
+                className="w-7 h-7 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-surface-800 flex items-center justify-center font-mono text-xs font-bold text-slate-800 dark:text-slate-200"
+              >
+                {v}
+              </div>
+            ))}
+          </div>
+          <span className="text-[9px] font-mono font-bold text-slate-400 uppercase">REAR</span>
+        </div>
+      );
+    case "hash-table":
+      return (
+        <div className="w-full h-20 bg-slate-100/70 dark:bg-surface-900/60 rounded-lg flex flex-col justify-center gap-1 px-4 overflow-hidden border border-slate-200/50 dark:border-slate-800/50">
+          {[
+            { idx: 0, k: "Alice", v: "92" },
+            { idx: 1, k: "Bob", v: "77" },
+          ].map((item) => (
+            <div key={item.idx} className="flex items-center gap-2 text-xs font-mono">
+              <span className="w-4 h-4 rounded bg-slate-200 dark:bg-surface-800 flex items-center justify-center text-[9px] font-bold text-slate-500">
+                {item.idx}
+              </span>
+              <span className="text-cyan-600 dark:text-cyan-400 text-xs">→</span>
+              <span className="px-2 py-0.5 rounded bg-white dark:bg-surface-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-[11px]">
+                {item.k}: {item.v}
+              </span>
+            </div>
+          ))}
+        </div>
+      );
+    case "binary-tree":
+    case "bst":
+      return (
+        <div className="w-full h-20 bg-slate-100/70 dark:bg-surface-900/60 rounded-lg flex flex-col items-center justify-center gap-1 p-1 overflow-hidden border border-slate-200/50 dark:border-slate-800/50 relative">
+          <svg className="absolute inset-0 w-full h-full pointer-events-none stroke-slate-300 dark:stroke-slate-700 stroke-2">
+            <line x1="50%" y1="20" x2="35%" y2="52" />
+            <line x1="50%" y1="20" x2="65%" y2="52" />
+          </svg>
+          <div className="relative z-10 w-6 h-6 rounded-full bg-cyan-600 text-white font-mono font-bold text-[10px] flex items-center justify-center shadow-xs">
+            50
+          </div>
+          <div className="relative z-10 flex items-center justify-center gap-10 mt-0.5">
+            <div className="w-5 h-5 rounded-full bg-white dark:bg-surface-800 border-2 border-slate-300 dark:border-slate-700 font-mono font-bold text-[9px] text-slate-800 dark:text-slate-200 flex items-center justify-center shadow-2xs">
+              30
+            </div>
+            <div className="w-5 h-5 rounded-full bg-white dark:bg-surface-800 border-2 border-slate-300 dark:border-slate-700 font-mono font-bold text-[9px] text-slate-800 dark:text-slate-200 flex items-center justify-center shadow-2xs">
+              70
+            </div>
+          </div>
+        </div>
+      );
+    case "heap":
+    case "priority-queue":
+      return (
+        <div className="w-full h-20 bg-slate-100/70 dark:bg-surface-900/60 rounded-lg flex flex-col items-center justify-center gap-1 p-1 overflow-hidden border border-slate-200/50 dark:border-slate-800/50 relative">
+          <svg className="absolute inset-0 w-full h-full pointer-events-none stroke-amber-500/40 dark:stroke-amber-400/40 stroke-2">
+            <line x1="50%" y1="20" x2="35%" y2="52" />
+            <line x1="50%" y1="20" x2="65%" y2="52" />
+          </svg>
+          <div className="relative z-10 w-6 h-6 rounded-full bg-amber-500 text-slate-950 font-mono font-bold text-[10px] flex items-center justify-center shadow-xs">
+            5
+          </div>
+          <div className="relative z-10 flex items-center justify-center gap-10 mt-0.5">
+            <div className="w-5 h-5 rounded-full bg-white dark:bg-surface-800 border-2 border-amber-500/60 font-mono font-bold text-[9px] text-slate-800 dark:text-slate-200 flex items-center justify-center shadow-2xs">
+              12
+            </div>
+            <div className="w-5 h-5 rounded-full bg-white dark:bg-surface-800 border-2 border-amber-500/60 font-mono font-bold text-[9px] text-slate-800 dark:text-slate-200 flex items-center justify-center shadow-2xs">
+              23
+            </div>
+          </div>
+        </div>
+      );
+    case "graphs":
+      return (
+        <div className="w-full h-20 bg-slate-100/70 dark:bg-surface-900/60 rounded-lg flex items-center justify-center p-2 overflow-hidden border border-slate-200/50 dark:border-slate-800/50 relative">
+          <svg className="absolute inset-0 w-full h-full pointer-events-none stroke-slate-300 dark:stroke-slate-700 stroke-2">
+            <line x1="30%" y1="35%" x2="70%" y2="35%" />
+            <line x1="30%" y1="35%" x2="50%" y2="75%" />
+            <line x1="70%" y1="35%" x2="50%" y2="75%" />
+          </svg>
+          <div className="absolute top-3 left-[28%] -translate-x-1/2 w-5 h-5 rounded-full bg-cyan-600 text-white font-mono font-bold text-[9px] flex items-center justify-center shadow-xs">
+            A
+          </div>
+          <div className="absolute top-3 right-[28%] translate-x-1/2 w-5 h-5 rounded-full bg-cyan-600 text-white font-mono font-bold text-[9px] flex items-center justify-center shadow-xs">
+            B
+          </div>
+          <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-emerald-600 text-white font-mono font-bold text-[9px] flex items-center justify-center shadow-xs">
+            C
+          </div>
+        </div>
+      );
+    case "binary-search":
+    case "linear-search":
+      return (
+        <div className="w-full h-20 bg-slate-100/70 dark:bg-surface-900/60 rounded-lg flex flex-col items-center justify-center gap-1 px-2 overflow-hidden border border-slate-200/50 dark:border-slate-800/50">
+          <div className="flex items-center gap-1 font-mono text-[8px] font-bold">
+            <span className="text-sky-500">LOW</span>
+            <span className="text-slate-300 dark:text-slate-700">──</span>
+            <span className="text-amber-500 bg-amber-500/10 px-1 rounded">MID</span>
+            <span className="text-slate-300 dark:text-slate-700">──</span>
+            <span className="text-purple-500">HIGH</span>
+          </div>
+          <div className="flex items-center gap-1">
+            {[10, 25, 42, 68, 90].map((v, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "w-7 h-7 rounded border flex items-center justify-center font-mono text-[11px] font-bold transition-transform",
+                  i === 2
+                    ? "bg-emerald-500 text-white border-emerald-600 shadow-xs scale-105"
+                    : "bg-white dark:bg-surface-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                )}
+              >
+                {v}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    case "bubble-sort":
+    case "selection-sort":
+    case "insertion-sort":
+    case "merge-sort":
+    case "quick-sort":
+      return (
+        <div className="w-full h-20 bg-slate-100/70 dark:bg-surface-900/60 rounded-lg flex items-end justify-center gap-1.5 px-3 pb-2.5 overflow-hidden border border-slate-200/50 dark:border-slate-800/50">
+          {[20, 50, 35, 75, 45, 90, 60].map((h, i) => (
+            <div
+              key={i}
+              style={{ height: `${h}%` }}
+              className={cn(
+                "w-3.5 rounded-t-sm transition-all duration-300",
+                i === 5
+                  ? "bg-cyan-500 shadow-sm"
+                  : i < 3
+                  ? "bg-emerald-500/80"
+                  : "bg-slate-300 dark:bg-surface-700"
+              )}
+            />
+          ))}
+        </div>
+      );
+    case "dp":
+      return (
+        <div className="w-full h-20 bg-slate-100/70 dark:bg-surface-900/60 rounded-lg flex items-center justify-center p-2 overflow-hidden border border-slate-200/50 dark:border-slate-800/50">
+          <div className="grid grid-cols-4 gap-1 text-[9px] font-mono text-center font-bold">
+            {[0, 1, 2, 3, 0, 3, 4, 7, 0, 3, 5, 8].map((v, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "w-6 h-4 rounded flex items-center justify-center border",
+                  i === 11
+                    ? "bg-emerald-500 text-white border-emerald-600 shadow-xs"
+                    : i === 6 || i === 7
+                    ? "bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border-cyan-500/40"
+                    : "bg-white dark:bg-surface-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400"
+                )}
+              >
+                {v}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    case "recursion":
+      return (
+        <div className="w-full h-20 bg-slate-100/70 dark:bg-surface-900/60 rounded-lg flex flex-col-reverse items-center justify-center gap-1 p-2 overflow-hidden border border-slate-200/50 dark:border-slate-800/50">
+          {["fact(1) → 1", "fact(2) = 2 · fact(1)", "fact(3) = 3 · fact(2)"].map((text, i) => (
+            <div
+              key={i}
+              className={cn(
+                "w-40 h-4 rounded border px-2 flex items-center justify-between font-mono text-[9px] font-bold",
+                i === 0
+                  ? "bg-emerald-500 text-white border-emerald-600"
+                  : "bg-white dark:bg-surface-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+              )}
+            >
+              <span>{text}</span>
+            </div>
+          ))}
+        </div>
+      );
+    default:
+      return null;
+  }
+}
+
 export default function VisualiseHomePage() {
   const [filter, setFilter] = React.useState<"all" | "ds" | "algo">("all");
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -309,6 +561,11 @@ export default function VisualiseHomePage() {
                         Interactive
                       </span>
                     </div>
+
+                    {/* VisuAlgo Visual Diagram Preview */}
+                    <Link href={`/visualise/${topic.slug}`} className="block my-3">
+                      <TopicVisualPreview slug={topic.slug} />
+                    </Link>
 
                     <Link href={`/visualise/${topic.slug}`} className="block group">
                       <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">

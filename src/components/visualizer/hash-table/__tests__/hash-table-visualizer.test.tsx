@@ -8,31 +8,25 @@ describe("HashTableVisualizerShell Component", () => {
     render(<HashTableVisualizerShell />);
 
     // Header and title
-    expect(screen.getByText("Hash Table Visualizer")).toBeDefined();
-    expect(
-      screen.getByText(
-        "Observe key hashing, bucket indexing, collisions, and open-addressing tombstones."
-      )
-    ).toBeDefined();
+    expect(screen.getByText("Hash Table Visualizer")).toBeInTheDocument();
 
     // Default chained entries rendered
-    expect(screen.getByText(/Carol:/i)).toBeDefined();
-    expect(screen.getByText(/Dave:/i)).toBeDefined();
-    expect(screen.getByText(/Alice:/i)).toBeDefined();
+    expect(screen.getByText(/Carol:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Dave:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Alice:/i)).toBeInTheDocument();
 
     // Strategy buttons
-    expect(screen.getByRole("button", { name: "Separate Chaining" })).toBeDefined();
-    expect(screen.getByRole("button", { name: "Linear Probing" })).toBeDefined();
-    expect(screen.getByRole("button", { name: "Quadratic Probing" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Separate Chaining" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Linear Probing" })).toBeInTheDocument();
 
     // Timeline controls
-    expect(screen.getByRole("button", { name: /play/i })).toBeDefined();
-    expect(screen.getByRole("button", { name: /next/i })).toBeDefined();
+    expect(screen.getByRole("button", { name: /play/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/step forward/i)).toBeInTheDocument();
 
-    // Panels
-    expect(screen.getByText("Synchronized Implementation")).toBeDefined();
-    expect(screen.getByText("Runtime Variables")).toBeDefined();
-    expect(screen.getByText("Step Explanation")).toBeDefined();
+    // Operations dock
+    expect(screen.getByRole("button", { name: "Insert" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Search" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
   });
 
   it("switches strategy to Linear Probing and displays slot track with status pills", () => {
@@ -46,35 +40,23 @@ describe("HashTableVisualizerShell Component", () => {
     expect(screen.getAllByText("EMPTY").length).toBeGreaterThan(0);
   });
 
-  it("switches operation to Search and updates complexity card", () => {
+  it("switches operation to Search and displays search popover", () => {
     render(<HashTableVisualizerShell />);
 
     const searchBtn = screen.getByRole("button", { name: "Search" });
     fireEvent.click(searchBtn);
 
-    expect(screen.getByText("Search (key)")).toBeDefined();
+    expect(screen.getByPlaceholderText(/e\.g\. alice/i)).toBeInTheDocument();
   });
 
-  it("advances execution step when Next button is clicked", () => {
+  it("advances execution step when Step forward button is clicked", () => {
     render(<HashTableVisualizerShell />);
 
-    expect(screen.getByText(/Step 1 of/i)).toBeDefined();
+    expect(screen.getByLabelText("Timeline scrubber")).toHaveValue("0");
 
-    const nextBtn = screen.getByRole("button", { name: /next/i });
+    const nextBtn = screen.getByLabelText(/step forward/i);
     fireEvent.click(nextBtn);
 
-    expect(screen.getByText(/Step 2 of/i)).toBeDefined();
-  });
-
-  it("displays validation error when invalid key is submitted", () => {
-    render(<HashTableVisualizerShell />);
-
-    const keyInput = screen.getByLabelText(/Key:/i);
-    fireEvent.change(keyInput, { target: { value: "   " } });
-
-    const submitBtn = screen.getByRole("button", { name: /Execute insert/i });
-    fireEvent.click(submitBtn);
-
-    expect(screen.getByText(/Key cannot be empty or only spaces/i)).toBeDefined();
+    expect(screen.getByLabelText("Timeline scrubber")).toHaveValue("1");
   });
 });

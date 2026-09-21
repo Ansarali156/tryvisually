@@ -9,6 +9,6 @@ describe("DpVisualizerShell Component", () => {
     expect(screen.getByText(/Dynamic Programming Visualizer/i)).toBeDefined();
     expect(screen.getByText(/0\/1 Knapsack/i)).toBeDefined();
     expect(screen.getByText(/Longest Common Subsequence/i)).toBeDefined();
-    expect(screen.getByText(/Run DP/i)).toBeDefined();
+    expect(screen.getByText(/Solve DP/i)).toBeDefined();
   });
 });

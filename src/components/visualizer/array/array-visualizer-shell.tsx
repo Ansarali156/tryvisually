@@ -21,17 +21,10 @@ import { useExecutionEngine } from "@/core/execution/hooks/use-execution-engine"
 import { useVisualizationState } from "@/core/visualization/hooks/use-visualization-state";
 import { useExecutionView } from "@/core/synchronization/hooks/use-execution-view";
 import type { SupportedLanguage } from "@/core/synchronization/types";
-import type { PlaybackSpeed as TimelinePlaybackSpeed } from "@/core/engine/types";
-import type { PlaybackSpeed as ExecutionPlaybackSpeed } from "@/core/execution/types";
-import { TimelineControls } from "@/components/ui/timeline-controls";
-import { CodeViewer } from "@/components/code/code-viewer";
-import { VariablesPanel } from "@/components/execution/variables-panel";
-import { ExplanationPanel } from "@/components/execution/explanation-panel";
-import { TopicBar } from "@/components/visualizer/topic-bar";
+import type { PlaybackSpeed } from "@/core/engine/types";
+import { VisuAlgoShell, VisuAlgoAction } from "../visualgo-shell";
 import { ArrayRenderer } from "./array-renderer";
-import { ArrayOperationBar } from "./array-operation-bar";
-import { ArrayComplexityCard } from "./array-complexity-card";
-import { Code2, Layers, BookOpen } from "lucide-react";
+import { Search, Plus, Trash2, Edit3, ArrowUpDown, Shuffle, Eye } from "lucide-react";
 
 export interface ArrayVisualizerShellProps {
   initialValues?: readonly number[];
@@ -46,39 +39,38 @@ export function ArrayVisualizerShell({
   const [arrayValues, setArrayValues] = React.useState<readonly number[]>(initialValues);
   const [currentOperation, setCurrentOperation] = React.useState<ArrayOperationType>("bubble-sort");
   const [activeLanguage, setActiveLanguage] = React.useState<SupportedLanguage>("python");
-  const [executionTab, setExecutionTab] = React.useState<"code" | "variables" | "explanation">("code");
 
-  // Track operation parameters for re-generating on array change
-  const [currentParams, setCurrentParams] = React.useState<Record<string, number>>({});
+  // Track operation parameters
+  const [currentParams, setCurrentParams] = React.useState<Record<string, string | number>>({});
 
   // 2. Canonical ArrayState creation
   const arrayState = React.useMemo(() => {
     return createArrayState(arrayValues);
   }, [arrayValues]);
 
-  // 3. Deterministic trace generation based on operation
+  // 3. Deterministic Trace Generation based on Operation & Parameters
   const trace = React.useMemo(() => {
     switch (currentOperation) {
       case "access": {
-        const idx = currentParams.index ?? 0;
+        const idx = Number(currentParams.index ?? 0);
         return createAccessTrace(arrayState, idx);
       }
       case "update": {
-        const idx = currentParams.index ?? 0;
-        const val = currentParams.value ?? 99;
+        const idx = Number(currentParams.index ?? 0);
+        const val = Number(currentParams.value ?? 99);
         return createUpdateTrace(arrayState, idx, val);
       }
       case "insert": {
-        const idx = currentParams.index ?? arrayState.items.length;
-        const val = currentParams.value ?? 42;
+        const idx = Number(currentParams.index ?? arrayState.items.length);
+        const val = Number(currentParams.value ?? 42);
         return createInsertTrace(arrayState, idx, val);
       }
       case "delete": {
-        const idx = currentParams.index ?? 0;
+        const idx = Number(currentParams.index ?? 0);
         return createDeleteTrace(arrayState, idx);
       }
       case "linear-search": {
-        const target = currentParams.target ?? (arrayValues[3] ?? 23);
+        const target = Number(currentParams.target ?? (arrayValues[3] ?? 23));
         return createLinearSearchTrace(arrayState, target);
       }
       case "compare": {
@@ -115,187 +107,281 @@ export function ArrayVisualizerShell({
     visualizationState,
   });
 
-  // Handlers
-  const handleApplyCustomArray = (newValues: number[]) => {
-    setArrayValues(newValues);
-    engine.reset();
-  };
+  // VisuAlgo Actions Dock configuration
+  const actions: VisuAlgoAction[] = [
+    {
+      id: "bubble-sort",
+      label: "Sort",
+      icon: ArrowUpDown,
+      description: "Sort the array using Bubble Sort",
+      onExecute: () => {
+        setCurrentOperation("bubble-sort");
+        setCurrentParams({});
+        engine.reset();
+        engine.play();
+      },
+    },
+    {
+      id: "linear-search",
+      label: "Search",
+      icon: Search,
+      description: "Search for a value in the array",
+      params: [
+        {
+          name: "target",
+          label: "Target (v)",
+          type: "number",
+          defaultValue: arrayValues[2] ?? 36,
+          placeholder: "Value to search",
+        },
+      ],
+      presets: [
+        { label: "Find First", values: { target: arrayValues[0] ?? 15 } },
+        { label: "Find Mid", values: { target: arrayValues[Math.floor(arrayValues.length / 2)] ?? 48 } },
+        { label: "Not Present", values: { target: 999 } },
+      ],
+      onExecute: (params) => {
+        setCurrentOperation("linear-search");
+        setCurrentParams(params);
+        engine.reset();
+        engine.play();
+      },
+    },
+    {
+      id: "insert",
+      label: "Insert",
+      icon: Plus,
+      description: "Insert an element at index i",
+      params: [
+        {
+          name: "index",
+          label: "Index (i)",
+          type: "number",
+          defaultValue: 0,
+          min: 0,
+          max: arrayValues.length,
+        },
+        {
+          name: "value",
+          label: "Value (v)",
+          type: "number",
+          defaultValue: 42,
+          placeholder: "Value",
+        },
+      ],
+      presets: [
+        { label: "Insert Head (i=0)", values: { index: 0, value: 5 } },
+        { label: "Insert Tail", values: { index: arrayValues.length, value: 99 } },
+      ],
+      onExecute: (params) => {
+        setCurrentOperation("insert");
+        setCurrentParams(params);
+        engine.reset();
+        engine.play();
+      },
+    },
+    {
+      id: "delete",
+      label: "Delete",
+      icon: Trash2,
+      description: "Delete element at index i",
+      params: [
+        {
+          name: "index",
+          label: "Index (i)",
+          type: "number",
+          defaultValue: 0,
+          min: 0,
+          max: Math.max(0, arrayValues.length - 1),
+        },
+      ],
+      presets: [
+        { label: "Delete Head (i=0)", values: { index: 0 } },
+        { label: "Delete Tail", values: { index: Math.max(0, arrayValues.length - 1) } },
+      ],
+      onExecute: (params) => {
+        setCurrentOperation("delete");
+        setCurrentParams(params);
+        engine.reset();
+        engine.play();
+      },
+    },
+    {
+      id: "access",
+      label: "Access",
+      icon: Eye,
+      description: "Direct O(1) index access",
+      params: [
+        {
+          name: "index",
+          label: "Index (i)",
+          type: "number",
+          defaultValue: 0,
+          min: 0,
+          max: Math.max(0, arrayValues.length - 1),
+        },
+      ],
+      presets: [
+        { label: "Index 0", values: { index: 0 } },
+        { label: "Index 3", values: { index: Math.min(3, arrayValues.length - 1) } },
+      ],
+      onExecute: (params) => {
+        setCurrentOperation("access");
+        setCurrentParams(params);
+        engine.reset();
+        engine.play();
+      },
+    },
+    {
+      id: "update",
+      label: "Update",
+      icon: Edit3,
+      description: "Update value at index i",
+      params: [
+        {
+          name: "index",
+          label: "Index (i)",
+          type: "number",
+          defaultValue: 0,
+          min: 0,
+          max: Math.max(0, arrayValues.length - 1),
+        },
+        {
+          name: "value",
+          label: "New Value (v)",
+          type: "number",
+          defaultValue: 88,
+        },
+      ],
+      onExecute: (params) => {
+        setCurrentOperation("update");
+        setCurrentParams(params);
+        engine.reset();
+        engine.play();
+      },
+    },
+    {
+      id: "randomize",
+      label: "Randomize",
+      icon: Shuffle,
+      description: "Generate new randomized array values",
+      onExecute: () => {
+        const randomized = Array.from({ length: 8 }, () => Math.floor(Math.random() * 85) + 10);
+        setArrayValues(randomized);
+        engine.reset();
+      },
+    },
+    {
+      id: "create",
+      label: "Create",
+      icon: Plus,
+      description: "Initialize or set custom array elements",
+      params: [
+        {
+          name: "input",
+          label: "Values",
+          type: "text",
+          placeholder: "comma separated (e.g. 50, 60, 70)",
+          defaultValue: arrayValues.join(", "),
+        },
+      ],
+      presets: [
+        { label: "Default", values: { input: "10, 20, 30" } },
+        { label: "Random 8", values: { input: "34, 12, 89, 55, 23, 76, 45, 91" } },
+      ],
+      onExecute: (params) => {
+        const val = String(params.input ?? "");
+        const parsed = val
+          .split(",")
+          .map((s: string) => parseInt(s.trim(), 10))
+          .filter((n: number) => !isNaN(n));
+        if (parsed.length > 0) {
+          setArrayValues(parsed);
+          engine.reset();
+        }
+      },
+    },
+  ];
 
-  const handleSelectOperation = (op: ArrayOperationType) => {
-    setCurrentOperation(op);
-    setCurrentParams({});
-    engine.reset();
-  };
-
-  const handleExecuteOperation = (params: Record<string, number>) => {
-    setCurrentParams(params);
-    engine.reset();
-  };
+  // Sub-variants
+  const subVariants = [
+    {
+      id: "bubble-sort",
+      label: "Bubble Sort",
+      active: currentOperation === "bubble-sort",
+      onSelect: () => {
+        setCurrentOperation("bubble-sort");
+        setCurrentParams({});
+        engine.reset();
+      },
+    },
+    {
+      id: "linear-search",
+      label: "Linear Search",
+      active: currentOperation === "linear-search",
+      onSelect: () => {
+        setCurrentOperation("linear-search");
+        setCurrentParams({ target: arrayValues[2] ?? 36 });
+        engine.reset();
+      },
+    },
+    {
+      id: "access",
+      label: "O(1) Access",
+      active: currentOperation === "access",
+      onSelect: () => {
+        setCurrentOperation("access");
+        setCurrentParams({ index: 0 });
+        engine.reset();
+      },
+    },
+  ];
 
   return (
-    <div className={cn("flex flex-col min-h-screen bg-surface-50 dark:bg-surface-950", className)}>
-      {/* Compact Topic Navigation Area */}
-      <TopicBar currentSlug="arrays" basePath="/visualise" />
-
-      {/* Main Dominant Workspace */}
-      <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto flex flex-col gap-6">
-        
-        {/* ============================================================== */}
-        {/* DOMINANT VISUALIZATION WORKSPACE                               */}
-        {/* ============================================================== */}
-        <div className="rounded-2xl border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-surface-900 shadow-sm overflow-hidden flex flex-col">
-          {/* Canvas Header */}
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-surface-50/80 dark:bg-surface-950/60">
-            <div>
-              <h1 className="text-base font-bold text-slate-900 dark:text-white">
-                Array Visualizer
-              </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Explore how arrays store and manipulate elements.
-              </p>
-            </div>
-            <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded-md bg-brand-50 dark:bg-brand-950 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800">
-              Step {engine.currentStepIndex + 1} of {engine.totalSteps}
-            </span>
-          </div>
-
-          {/* Main Dominant Canvas Stage */}
-          <div className="min-h-[280px] sm:min-h-[340px] flex items-center justify-center p-6 bg-radial-pattern">
-            <ArrayRenderer
-              visualizationState={visualizationState}
-              resolvedHighlights={resolvedHighlights}
-              speed={engine.speed}
-            />
-          </div>
-
-          {/* Compact Controls Directly Below Visualization */}
-          <div className="border-t border-slate-200 dark:border-slate-800 bg-surface-50/70 dark:bg-surface-950/50 p-4 flex flex-col gap-3">
-            {/* Row 1: Operation Selector, Input Parameters & Run */}
-            <ArrayOperationBar
-              currentOperation={currentOperation}
-              onSelectOperation={handleSelectOperation}
-              onApplyCustomArray={handleApplyCustomArray}
-              onExecuteOperation={handleExecuteOperation}
-              arrayLength={arrayValues.length}
-            />
-
-            {/* Row 2: Playback Timeline Controls */}
-            <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
-              <TimelineControls
-                isPlaying={engine.isPlaying}
-                currentStep={engine.currentStepIndex}
-                totalSteps={engine.totalSteps}
-                speed={
-                  (engine.speed === 0.5 || engine.speed === 1 || engine.speed === 1.5 || engine.speed === 2
-                    ? engine.speed
-                    : 1) as TimelinePlaybackSpeed
-                }
-                onPlay={engine.play}
-                onPause={engine.pause}
-                onStepForward={engine.next}
-                onStepBackward={engine.previous}
-                onGoToStart={engine.jumpToStart}
-                onGoToEnd={engine.jumpToEnd}
-                onSeek={engine.jumpTo}
-                onSpeedChange={(s: TimelinePlaybackSpeed) => engine.setSpeed(s as ExecutionPlaybackSpeed)}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* ============================================================== */}
-        {/* COMPACT LEARNING / EXECUTION SECTION                           */}
-        {/* ============================================================== */}
-        <div className="rounded-2xl border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-surface-900 shadow-sm overflow-hidden flex flex-col">
-          {/* Section Header with Tabs: [Code] [Variables] [Explanation] */}
-          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-slate-200 dark:border-slate-800 bg-surface-50/80 dark:bg-surface-950/60">
-            <div className="flex items-center gap-1 rounded-lg bg-surface-200/80 dark:bg-surface-800 p-1">
-              <button
-                onClick={() => setExecutionTab("code")}
-                className={cn(
-                  "px-4 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors",
-                  executionTab === "code"
-                    ? "bg-white text-slate-900 shadow-xs dark:bg-surface-900 dark:text-white"
-                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-                )}
-              >
-                <Code2 className="h-3.5 w-3.5" />
-                <span>Code</span>
-              </button>
-
-              <button
-                onClick={() => setExecutionTab("variables")}
-                className={cn(
-                  "px-4 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors",
-                  executionTab === "variables"
-                    ? "bg-white text-slate-900 shadow-xs dark:bg-surface-900 dark:text-white"
-                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-                )}
-              >
-                <Layers className="h-3.5 w-3.5" />
-                <span>Variables</span>
-              </button>
-
-              <button
-                onClick={() => setExecutionTab("explanation")}
-                className={cn(
-                  "px-4 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors",
-                  executionTab === "explanation"
-                    ? "bg-white text-slate-900 shadow-xs dark:bg-surface-900 dark:text-white"
-                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-                )}
-              >
-                <BookOpen className="h-3.5 w-3.5" />
-                <span>Explanation</span>
-              </button>
-            </div>
-
-            <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
-              Active: {currentOperation}
-            </span>
-          </div>
-
-          {/* Tab Content Display */}
-          <div className="p-4 sm:p-5">
-            {/* 1. Code Tab */}
-            <div className={cn(executionTab !== "code" && "hidden")}>
-              <CodeViewer
-                sourceCode={executionView.sourceCode}
-                activeLines={executionView.activeCodeLines}
-                primaryLine={executionView.primaryCodeLine}
-                language={activeLanguage}
-                onLanguageChange={setActiveLanguage}
-                availableLanguages={["python", "typescript"]}
-                title="Synchronized Implementation"
-                className="border-0 shadow-none"
-              />
-            </div>
-
-            {/* 2. Variables Tab */}
-            <div className={cn(executionTab !== "variables" && "hidden")}>
-              <VariablesPanel
-                variables={executionView.variables}
-                variableDiffs={executionView.variableDiffs}
-                title="Runtime Variables"
-              />
-            </div>
-
-            {/* 3. Explanation Tab */}
-            <div className={cn(executionTab !== "explanation" && "hidden", "space-y-4")}>
-              <ExplanationPanel
-                explanation={executionView.explanation}
-                operation={executionView.operation}
-                codeLine={executionView.primaryCodeLine}
-                stepIndex={executionView.stepIndex}
-                totalSteps={executionView.totalSteps}
-              />
-
-              <ArrayComplexityCard operation={currentOperation} />
-            </div>
-          </div>
-        </div>
-
-      </main>
-    </div>
+    <VisuAlgoShell
+      title="Array Visualizer"
+      category="Data Structures"
+      subVariants={subVariants}
+      currentAction={engine.currentStep?.operation || "Ready"}
+      stepExplanation={engine.currentStep?.explanation || "Select an array operation to execute."}
+      whyExplanation={undefined}
+      timeComplexity={
+        currentOperation === "access"
+          ? "O(1)"
+          : currentOperation === "linear-search"
+          ? "O(n)"
+          : currentOperation === "bubble-sort"
+          ? "O(n²)"
+          : "O(n)"
+      }
+      spaceComplexity="O(1)"
+      currentStep={engine.currentStepIndex}
+      totalSteps={engine.totalSteps}
+      isPlaying={engine.isPlaying}
+      speed={engine.speed as PlaybackSpeed}
+      onPlay={engine.play}
+      onPause={engine.pause}
+      onStepForward={engine.next}
+      onStepBackward={engine.previous}
+      onGoToStart={engine.jumpToStart}
+      onGoToEnd={engine.jumpToEnd}
+      onSeek={(step) => engine.jumpTo(step)}
+      onSpeedChange={(spd) => engine.setSpeed(spd)}
+      actions={actions}
+      code={executionView.sourceCode}
+      activeCodeLines={executionView.activeCodeLines}
+      language={activeLanguage}
+      onLanguageChange={setActiveLanguage}
+      className={className}
+    >
+      {/* Full-Stage Array Canvas Stage */}
+      <div className="flex flex-col items-center justify-center gap-6 w-full max-w-5xl py-8">
+        <ArrayRenderer
+          visualizationState={visualizationState}
+          resolvedHighlights={resolvedHighlights}
+          speed={engine.speed}
+        />
+      </div>
+    </VisuAlgoShell>
   );
 }
